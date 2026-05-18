@@ -93,8 +93,14 @@ def process_item(item_id):
     dest_dir = os.path.join(LPK_DIR, item_id)
     
     if not os.path.exists(src_dir):
-        print(f"❌ [ERROR] Source folder not found in Steam cache: {src_dir}")
-        return False
+        print(f"📡 [DOWNLOAD] Source folder not found in Steam cache: {src_dir}")
+        print(f"   Initiating automatic download of Workshop Item {item_id} via SteamCMD...")
+        code, stdout, stderr = run_command(f"steamcmd +login anonymous +workshop_download_item 616720 {item_id} +quit")
+        if code == 0 and os.path.exists(src_dir):
+            print(f"   ✅ [DOWNLOAD SUCCESS] Successfully downloaded {item_id} via SteamCMD!")
+        else:
+            print(f"   ❌ [DOWNLOAD ERROR] Failed to download {item_id}. Exit code: {code}")
+            return False
         
     # Make sure packages_lpk exists
     os.makedirs(LPK_DIR, exist_ok=True)
