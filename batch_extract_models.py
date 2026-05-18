@@ -136,15 +136,68 @@ for item in items:
         except Exception as e:
             print(f"SetupSpineModel failed for {basename}: {e} (Continuing anyway)")
             
-        # Rename model0.json
+        # Rename and clean model0.json
         model0_path = os.path.join(model_dir, "model0.json")
         if os.path.exists(model0_path):
-            if moc3_files:
-                os.rename(model0_path, os.path.join(model_dir, f"{basename}.model3.json"))
-                print(f"Renamed model0.json to {basename}.model3.json")
-            else:
-                os.rename(model0_path, os.path.join(model_dir, f"{basename}.model.json"))
-                print(f"Renamed model0.json to {basename}.model.json (v2)")
+            model_json_name = f"{basename}.model3.json" if moc3_files else f"{basename}.model.json"
+            model_json_path = os.path.join(model_dir, model_json_name)
+            os.rename(model0_path, model_json_path)
+            print(f"Renamed model0.json to {model_json_name}")
+            
+            # Clean up missing expressions/motions references inside model JSON to ensure audit compliance
+            try:
+                with open(model_json_path, "r", encoding="utf-8") as f:
+                    model_data = json.load(f)
+                
+                # 1. Clean Expressions
+                if "FileReferences" in model_data and "Expressions" in model_data["FileReferences"]:
+                    orig_expressions = model_data["FileReferences"]["Expressions"]
+                    cleaned_expressions = []
+                    for exp in orig_expressions:
+                        exp_file = exp.get("File") or exp.get("Name")
+                        if exp_file and not exp_file.endswith(".json"):
+                            exp_file = exp_file + ".exp3.json"
+                        
+                        if exp_file:
+                            if os.path.exists(os.path.join(model_dir, exp_file)):
+                                cleaned_expressions.append({
+                                    "Name": exp.get("Name") or os.path.splitext(exp_file)[0],
+                                    "File": exp_file
+                                })
+                            else:
+                                print(f"🧹 [PRUNE] Removed missing expression reference '{exp_file}' from model JSON.")
+                    
+                    if cleaned_expressions:
+                        model_data["FileReferences"]["Expressions"] = cleaned_expressions
+                    else:
+                        del model_data["FileReferences"]["Expressions"]
+                
+                # 2. Clean Motions
+                if "FileReferences" in model_data and "Motions" in model_data["FileReferences"]:
+                    motions_dict = model_data["FileReferences"]["Motions"]
+                    cleaned_motions = {}
+                    for group_name, motion_list in list(motions_dict.items()):
+                        cleaned_list = []
+                        for motion in motion_list:
+                            motion_file = motion.get("File")
+                            if motion_file:
+                                if os.path.exists(os.path.join(model_dir, motion_file)):
+                                    cleaned_list.append(motion)
+                                else:
+                                    print(f"🧹 [PRUNE] Removed missing motion reference '{motion_file}' from group '{group_name}'.")
+                        if cleaned_list:
+                            cleaned_motions[group_name] = cleaned_list
+                    if cleaned_motions:
+                        model_data["FileReferences"]["Motions"] = cleaned_motions
+                    else:
+                        del model_data["FileReferences"]["Motions"]
+                
+                # Write back cleaned JSON
+                with open(model_json_path, "w", encoding="utf-8") as f:
+                    json.dump(model_data, f, ensure_ascii=False, indent=2)
+                print(f"✅ [CLEANUP] Successfully sanitized model references in {model_json_name}")
+            except Exception as e:
+                print(f"⚠️ [WARNING] Failed to clean up model JSON references: {e}")
             
         # Zip the contents
         try:
