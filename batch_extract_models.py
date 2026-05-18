@@ -96,6 +96,18 @@ for item in items:
     if not os.path.exists(config_path):
         print(f"No config.json found for {basename}")
         continue
+
+    # Ensure config.json has the correct fileId (especially for Steam Workshop items where fileId is empty)
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            config_data = json.load(f)
+        if not config_data.get("fileId"):
+            config_data["fileId"] = basename
+            with open(config_path, "w", encoding="utf-8") as f:
+                json.dump(config_data, f, ensure_ascii=False, indent=2)
+            print(f"🔧 [FIX] Set empty fileId in config.json to '{basename}' for decryption compatibility.")
+    except Exception as e:
+        print(f"⚠️ [WARNING] Failed to pre-verify config.json fileId: {e}")
         
     # 2. Extract LPK
     if os.path.exists(extract_target):
