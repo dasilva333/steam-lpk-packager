@@ -227,6 +227,11 @@ app.get('/api/stats', async (req, res) => {
     }
 });
 
+// API: Config Info
+app.get('/api/config', (req, res) => {
+    res.json({ projectPath: __dirname });
+});
+
 // Download endpoints for packages
 app.get('/download/:type/:filename', (req, res) => {
     const { type, filename } = req.params;

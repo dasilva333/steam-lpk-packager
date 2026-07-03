@@ -220,10 +220,18 @@
                                     <button 
                                         v-if="item.packaged === 1" 
                                         @click="copyPath(item)" 
-                                        class="copy-btn-icon" 
-                                        title="Copy relative ZIP file path to clipboard"
+                                        class="action-btn-icon" 
+                                        title="Copy absolute FQ file path to clipboard"
                                     >
                                         📋
+                                    </button>
+                                    <button 
+                                        v-else 
+                                        @click="triggerDownload(item)" 
+                                        class="action-btn-icon download" 
+                                        title="Download and pack this item immediately"
+                                    >
+                                        📥
                                     </button>
                                 </div>
                                 <p class="card-author">By {{ item.creator || 'Anonymous' }}</p>

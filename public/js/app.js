@@ -26,19 +26,44 @@ createApp({
         const stats = ref({});
         const statsLoading = ref(false);
         const toastMessage = ref('');
+        const projectRootDir = ref('');
+
+        // Fetch backend config path info on load
+        const fetchConfig = async () => {
+            try {
+                const res = await fetch('/api/config');
+                const data = await res.json();
+                projectRootDir.value = data.projectPath || '';
+            } catch (err) {
+                console.error("Failed to load project configuration path:", err);
+            }
+        };
 
         const copyPath = (item) => {
             const folder = item.steam_type.toLowerCase() === 'live2d' ? 'live2d_packages' : 'spine_packages';
             const filename = `${item.steam_type.toLowerCase()}_${item.id}.zip`;
-            const relativePath = `cli/${folder}/${filename}`;
             
-            navigator.clipboard.writeText(relativePath).then(() => {
-                toastMessage.value = `Copied to clipboard: ${relativePath}`;
+            // Format absolute path depending on Windows or Unix formats resolved by backend
+            const isWin = projectRootDir.value.includes('\\') || projectRootDir.value.includes(':');
+            const separator = isWin ? '\\' : '/';
+            const fqPath = `${projectRootDir.value}${separator}cli${separator}${folder}${separator}${filename}`;
+            
+            navigator.clipboard.writeText(fqPath).then(() => {
+                toastMessage.value = `Copied absolute path to clipboard!`;
                 setTimeout(() => {
                     toastMessage.value = '';
                 }, 3000);
             }).catch(err => {
                 console.error('Could not copy path: ', err);
+            });
+        };
+
+        const triggerDownload = (item) => {
+            // Load the item ID into packer urls box and switch tabs to execute packaging
+            urls.value = item.id;
+            currentTab.value = 'packer';
+            nextTick(() => {
+                startPackaging();
             });
         };
 
@@ -226,6 +251,7 @@ createApp({
 
         onMounted(() => {
             fetchPackages();
+            fetchConfig();
         });
 
         return {
@@ -243,7 +269,9 @@ createApp({
             stats,
             statsLoading,
             toastMessage,
+            projectRootDir,
             copyPath,
+            triggerDownload,
             runReport,
             startPackaging,
             clearLog,

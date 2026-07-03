@@ -724,7 +724,7 @@ body {
     gap: 8px;
 }
 
-.copy-btn-icon {
+.action-btn-icon {
     background: none;
     border: none;
     cursor: pointer;
@@ -734,9 +734,18 @@ body {
     padding: 2px;
 }
 
-.copy-btn-icon:hover {
+.action-btn-icon:hover {
     opacity: 1;
     transform: scale(1.15);
+}
+
+.action-btn-icon.download {
+    opacity: 0.7;
+}
+
+.action-btn-icon.download:hover {
+    opacity: 1;
+    filter: drop-shadow(0 0 4px var(--primary));
 }
 
 .local-badge {
