@@ -97,8 +97,8 @@ def process_item(item_id):
     
     # Run the legacy python extractor
     # Explicitly run under the relative cli directory where batch_extract_models expects its paths
-    cmd = f'py cli/batch_extract_models.py'
-    subprocess.run(cmd, shell=True, cwd=BASE_DIR)
+    cmd = f'py batch_extract_models.py'
+    subprocess.run(cmd, shell=True, cwd=os.path.join(BASE_DIR, "cli"))
     
     # Clean up temp package folder
     if os.path.exists(temp_target):
