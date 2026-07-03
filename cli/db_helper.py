@@ -41,9 +41,18 @@ def init_db():
             indexed_at INTEGER
         )
     ''')
+    
+    # Check if download_failed column exists (migration helper)
+    cursor.execute("PRAGMA table_info(models)")
+    columns = [col[1] for col in cursor.fetchall()]
+    if 'download_failed' not in columns:
+        cursor.execute("ALTER TABLE models ADD COLUMN download_failed INTEGER DEFAULT 0")
+    if 'download_failed_reason' not in columns:
+        cursor.execute("ALTER TABLE models ADD COLUMN download_failed_reason TEXT")
+        
     conn.commit()
     conn.close()
-    return {"success": True, "message": "Database initialized"}
+    return {"success": True, "message": "Database initialized & migrated"}
 
 def query_catalog(params):
     conn = get_connection()
