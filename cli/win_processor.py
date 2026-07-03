@@ -102,7 +102,14 @@ def process_item(item_id):
     
     # Clean up temp package folder
     if os.path.exists(temp_target):
-        shutil.rmtree(temp_target)
+        for _ in range(5):
+            try:
+                shutil.rmtree(temp_target)
+                break
+            except PermissionError:
+                time.sleep(0.5)
+            except Exception:
+                break
         
     # 4. Check outputs inside cli/live2d_packages or cli/spine_packages
     live2d_zip = os.path.join(BASE_DIR, "cli", "live2d_packages", f"live2d_{item_id}.zip")
@@ -184,7 +191,7 @@ def start_processing_phase():
             success, msg = process_item(fid)
             print(f"  {msg}")
         except Exception as e:
-            print(f"  ❌ Error processing: {str(e)}")
+            print(f"  [ERROR] processing: {str(e)}")
             
     print("=" * 60)
     print("Processing Phase finished!")
