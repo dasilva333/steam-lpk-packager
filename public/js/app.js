@@ -25,6 +25,22 @@ createApp({
         // Settings / Statistics state
         const stats = ref({});
         const statsLoading = ref(false);
+        const toastMessage = ref('');
+
+        const copyPath = (item) => {
+            const folder = item.steam_type.toLowerCase() === 'live2d' ? 'live2d_packages' : 'spine_packages';
+            const filename = `${item.steam_type.toLowerCase()}_${item.id}.zip`;
+            const relativePath = `cli/${folder}/${filename}`;
+            
+            navigator.clipboard.writeText(relativePath).then(() => {
+                toastMessage.value = `Copied to clipboard: ${relativePath}`;
+                setTimeout(() => {
+                    toastMessage.value = '';
+                }, 3000);
+            }).catch(err => {
+                console.error('Could not copy path: ', err);
+            });
+        };
 
         const appendLog = (text, type = 'info') => {
             log.value.push({ text, type });
@@ -226,6 +242,8 @@ createApp({
             totalPages,
             stats,
             statsLoading,
+            toastMessage,
+            copyPath,
             runReport,
             startPackaging,
             clearLog,

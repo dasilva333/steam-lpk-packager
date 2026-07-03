@@ -202,7 +202,7 @@
 
                 <div v-else>
                     <div class="catalog-grid">
-                        <div v-for="item in catalogItems" :key="item.id" class="model-card">
+                        <div v-for="item in catalogItems" :key="item.id" class="model-card" :class="{ 'not-cached': item.packaged === 0 }">
                             <div class="card-thumb-wrapper">
                                 <img 
                                     :src="item.thumbnail_local ? item.thumbnail_local : 'https://placehold.co/400x300/181b28/8b949e?text=Thumbnail+Pending'" 
@@ -211,9 +211,21 @@
                                     onerror="this.src='https://placehold.co/400x300/181b28/8b949e?text=No+Thumbnail'"
                                 >
                                 <span :class="['type-badge', item.steam_type.toLowerCase()]">{{ item.steam_type }}</span>
+                                <span v-if="item.packaged === 1" class="local-badge" title="Asset ZIP package is available on local disk">📂 Local Cache</span>
+                                <span v-else class="local-badge cloud" title="Asset is indexed but not yet downloaded to local disk">☁️ Steam Cloud</span>
                             </div>
                             <div class="card-details">
-                                <h3 class="card-title" :title="item.title">{{ item.title }}</h3>
+                                <div class="card-header-row">
+                                    <h3 class="card-title" :title="item.title">{{ item.title }}</h3>
+                                    <button 
+                                        v-if="item.packaged === 1" 
+                                        @click="copyPath(item)" 
+                                        class="copy-btn-icon" 
+                                        title="Copy relative ZIP file path to clipboard"
+                                    >
+                                        📋
+                                    </button>
+                                </div>
                                 <p class="card-author">By {{ item.creator || 'Anonymous' }}</p>
                                 <div class="card-bottom">
                                     <span class="card-size">{{ (item.file_size / (1024 * 1024)).toFixed(2) }} MB</span>
@@ -225,6 +237,11 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- Toast Notification -->
+                    <div v-if="toastMessage" class="toast-alert">
+                        <span>✨</span> {{ toastMessage }}
                     </div>
 
                     <!-- Pagination -->
