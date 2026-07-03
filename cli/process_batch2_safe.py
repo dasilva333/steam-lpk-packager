@@ -21,7 +21,12 @@ else:
     LIVE2D_DIR = os.path.join(BASE_DIR, "packages_live2d")
     SPINE_DIR = os.path.join(BASE_DIR, "packages_spine")
 
-STEAM_CONTENT_DIR = "/Users/richardpinedo/Library/Application Support/Steam/steamapps/workshop/content/616720"
+# Resolve Steam content directory dynamically (cross-platform relative folder fallback)
+if os.name == 'nt':
+    STEAM_CONTENT_DIR = r"C:\Program Files (x86)\Steam\steamapps\workshop\content\616720"
+else:
+    home = os.path.expanduser("~")
+    STEAM_CONTENT_DIR = os.path.join(home, "Library/Application Support/Steam/steamapps/workshop/content/616720")
 INCOMPATIBLE_LOG = os.path.join(SPINE_DIR, "incompatible_spine_models.md")
 
 
