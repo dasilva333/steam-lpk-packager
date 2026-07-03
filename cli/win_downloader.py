@@ -22,35 +22,26 @@ def download_item(item_id):
     if os.path.exists(item_dir) and len(os.listdir(item_dir)) > 0:
         return True, "Already downloaded"
         
-    print(f"Downloading {item_id} via steamcmd...")
-    # Target steamcmd workshop download path
-    cmd = f'steamcmd +login anonymous +workshop_download_item 616720 {item_id} +quit'
+    print(f"Downloading {item_id} via local steamcmd...")
+    
+    # Resolve the local steamcmd relative binary
+    steamcmd_exe = os.path.join(BASE_DIR, "steamcmd", "steamcmd.exe")
+    if not os.path.exists(steamcmd_exe):
+        return False, f"Local steamcmd.exe not found at: {steamcmd_exe}"
+        
+    cmd = f'"{steamcmd_exe}" +login anonymous +workshop_download_item 616720 {item_id} +quit'
     
     # Run steamcmd and track output
     process = subprocess.run(cmd, shell=True, capture_output=True, text=True)
     
-    # Check if download actually populated Steam's default workshop cache folder
-    # On Windows, steamcmd downloads to its installation directory under steamapps\workshop\content\616720\<id>
-    # We will locate it and move it to our custom E:\lpk-studio-storage\workshop_cache directory
-    # Default steamcmd paths are typically resolved relatively. Let's look for the downloaded content.
-    steamcmd_workshop_dir = None
-    
-    # Check common locations where steamcmd stores workshop items on Windows
+    # On Windows, local steamcmd downloads to: steam-lpk-packager\steamcmd\steamapps\workshop\content\616720\<id>
     paths_to_check = [
+        os.path.join(BASE_DIR, "steamcmd", "steamapps", "workshop", "content", "616720"),
         os.path.expandvars(r"%LOCALAPPDATA%\VirtualStore\Program Files (x86)\Steam\steamapps\workshop\content\616720"),
         r"C:\steamcmd\steamapps\workshop\content\616720",
         r"C:\Program Files (x86)\Steam\steamapps\workshop\content\616720",
     ]
     
-    # Also check relative to where steamcmd might be installed on path
-    try:
-        steamcmd_path = shutil.which("steamcmd")
-        if steamcmd_path:
-            steamcmd_root = os.path.dirname(steamcmd_path)
-            paths_to_check.append(os.path.join(steamcmd_root, "steamapps", "workshop", "content", "616720"))
-    except:
-        pass
-
     source_dir = None
     for p in paths_to_check:
         test_path = os.path.join(p, item_id)
@@ -65,8 +56,13 @@ def download_item(item_id):
     else:
         # Check process output for error logs
         if "failed" in process.stdout.lower() or "error" in process.stdout.lower():
-            return False, f"SteamCMD Error: {process.stdout.strip()[-200:]}"
+            # Extract last line or error snippet
+            err_lines = [l.strip() for l in process.stdout.split('\n') if l.strip()]
+            err_msg = err_lines[-1] if err_lines else "Unknown steamcmd failure"
+            return False, f"SteamCMD Error: {err_msg}"
         return False, "Download folder not found"
+            
+
 
 def start_download_phase():
     conn = get_connection()
