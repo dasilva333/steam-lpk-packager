@@ -16,6 +16,23 @@ BATCH_SIZE = 50  # Number of workshop downloads in a single steamcmd script sess
 def get_connection():
     return sqlite3.connect(DB_PATH)
 
+def log_download_failure(item_id, reason):
+    """
+    Marks an item as failed in SQLite database so it gets skipped next time.
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE models 
+            SET download_failed = 1, download_failed_reason = ? 
+            WHERE id = ?
+        ''', (reason, item_id))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"  [ERROR] Database logging failure for {item_id}: {str(e)}")
+
 def download_batch(items_to_download):
     """
     Downloads multiple items in a single steamcmd session using +runscript to save login/update overhead.
@@ -42,6 +59,14 @@ def download_batch(items_to_download):
     # Run the script via steamcmd
     process = subprocess.run(cmd, shell=True, capture_output=True, text=True, cwd=os.path.join(BASE_DIR, "steamcmd"))
     
+    # Save the execution logs to trace failures
+    log_dir = os.path.join(BASE_DIR, "cli", "logs")
+    os.makedirs(log_dir, exist_ok=True)
+    with open(os.path.join(log_dir, "steamcmd_last_batch.log"), "w", encoding="utf-8") as lf:
+        lf.write(process.stdout)
+        if process.stderr:
+            lf.write("\n--- STDERR ---\n" + process.stderr)
+
     # Paths where steamcmd might have saved the downloaded workshop contents
     paths_to_check = [
         os.path.join(BASE_DIR, "steamcmd", "steamapps", "workshop", "content", "616720"),
@@ -52,6 +77,8 @@ def download_batch(items_to_download):
     
     # Process files downloaded by the script
     moved_count = 0
+    failures = []
+    
     for item_id in items_to_download:
         item_dir = os.path.join(CACHE_DIR, item_id)
         if os.path.exists(item_dir) and len(os.listdir(item_dir)) > 0:
@@ -74,6 +101,16 @@ def download_batch(items_to_download):
             except:
                 pass
             moved_count += 1
+        else:
+            # Analyze steamcmd logs to extract exact error reason
+            reason = "Download failed (missing or deprecated from Steam Workshop)"
+            for line in process.stdout.split('\n'):
+                if f"download item {item_id}" in line.lower() or f"item {item_id}" in line.lower():
+                    if "failed" in line.lower() or "error" in line.lower():
+                        reason = line.strip()
+                        break
+            failures.append((item_id, reason))
+            log_download_failure(item_id, reason)
             
     # Remove the temporary runscript file
     if os.path.exists(script_path):
@@ -82,18 +119,24 @@ def download_batch(items_to_download):
         except:
             pass
             
+    if failures:
+        print(f"  [WARNING] Failed downloads in this batch:")
+        for fid, freason in failures:
+            print(f"    - ID: {fid} | {freason}")
+            
     return True, f"Batch complete. Successfully acquired {moved_count}/{len(items_to_download)} new items."
 
 def start_download_phase():
     conn = get_connection()
     cursor = conn.cursor()
     
-    # Fetch all Live2D and Spine models under our 1.5GB size threshold
+    # Fetch all Live2D and Spine models under our 1.5GB size threshold that haven't failed previously
     cursor.execute('''
         SELECT id, title, file_size, steam_type 
         FROM models 
         WHERE steam_type IN ('Live2D', 'Spine') 
           AND file_size <= ?
+          AND download_failed = 0
     ''', (MAX_SIZE,))
     
     items = cursor.fetchall()
@@ -125,7 +168,7 @@ def start_download_phase():
             success, msg = download_batch(batch)
             print(f"  {msg}")
         except Exception as e:
-            print(f"  ❌ Batch Execution Error: {str(e)}")
+            print(f"  [ERROR] Batch Execution Error: {str(e)}")
             
         # Give SteamCmd a small delay between session scripts to avoid socket throttling
         time.sleep(2)

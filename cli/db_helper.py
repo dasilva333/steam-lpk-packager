@@ -34,6 +34,8 @@ def init_db():
             compatible INTEGER,
             compat_reason TEXT,
             packaged INTEGER DEFAULT 0,
+            download_failed INTEGER DEFAULT 0,
+            download_failed_reason TEXT,
             created_at INTEGER,
             updated_at INTEGER,
             indexed_at INTEGER
