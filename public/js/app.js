@@ -28,14 +28,46 @@ createApp({
         const toastMessage = ref('');
         const projectRootDir = ref('');
 
+        const editableConfig = reactive({
+            steamContentDir: '',
+            storageRoot: '',
+            maxSizeGB: ''
+        });
+
         // Fetch backend config path info on load
         const fetchConfig = async () => {
             try {
                 const res = await fetch('/api/config');
                 const data = await res.json();
                 projectRootDir.value = data.projectPath || '';
+                editableConfig.steamContentDir = data.steamContentDir || '';
+                editableConfig.storageRoot = data.storageRoot || '';
+                editableConfig.maxSizeGB = data.maxSizeGB || '';
             } catch (err) {
                 console.error("Failed to load project configuration path:", err);
+            }
+        };
+
+        const saveSettings = async () => {
+            try {
+                const res = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        steamContentDir: editableConfig.steamContentDir,
+                        storageRoot: editableConfig.storageRoot,
+                        maxSizeGB: editableConfig.maxSizeGB
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    toastMessage.value = data.message;
+                    setTimeout(() => {
+                        toastMessage.value = '';
+                    }, 3000);
+                }
+            } catch (err) {
+                console.error("Failed to save configuration settings:", err);
             }
         };
 
@@ -270,8 +302,10 @@ createApp({
             statsLoading,
             toastMessage,
             projectRootDir,
+            editableConfig,
             copyPath,
             triggerDownload,
+            saveSettings,
             runReport,
             startPackaging,
             clearLog,

@@ -285,20 +285,40 @@
                 <div class="settings-grid">
                     <!-- Storage info box -->
                     <section class="card settings-card">
-                        <h2>Directory Configurations</h2>
+                        <h2>Directory & Pipeline Configuration</h2>
                         <div class="settings-list">
                             <div class="settings-item">
-                                <span class="settings-label">Windows Storage Root</span>
-                                <span class="settings-value mono">E:\lpk-studio-storage</span>
+                                <span class="settings-label">Steam Workshop Content Folder (616720)</span>
+                                <input 
+                                    v-model="editableConfig.steamContentDir" 
+                                    type="text" 
+                                    class="settings-input"
+                                    placeholder="e.g. C:\Program Files (x86)\Steam\steamapps\workshop\content\616720"
+                                >
                             </div>
                             <div class="settings-item">
-                                <span class="settings-label">Workshop Cache Path</span>
-                                <span class="settings-value mono">E:\lpk-studio-storage\workshop_cache</span>
+                                <span class="settings-label">Windows Storage Root Path</span>
+                                <input 
+                                    v-model="editableConfig.storageRoot" 
+                                    type="text" 
+                                    class="settings-input"
+                                    placeholder="e.g. E:\lpk-studio-storage"
+                                >
                             </div>
                             <div class="settings-item">
-                                <span class="settings-label">Database Path</span>
-                                <span class="settings-value mono">/db/catalog.sqlite</span>
+                                <span class="settings-label">Max Model Size Threshold (GB)</span>
+                                <input 
+                                    v-model="editableConfig.maxSizeGB" 
+                                    type="text" 
+                                    class="settings-input"
+                                    placeholder="e.g. 1.5"
+                                >
                             </div>
+                        </div>
+                        <div class="settings-actions">
+                            <button @click="saveSettings" class="btn primary-btn save-settings-btn">
+                                <span>💾</span> Save Settings
+                            </button>
                         </div>
                     </section>
 

@@ -227,9 +227,69 @@ app.get('/api/stats', async (req, res) => {
     }
 });
 
+// Helper to read .env key=values
+function loadEnv() {
+    const envPath = path.join(__dirname, '.env');
+    const config = {};
+    if (fs.existsSync(envPath)) {
+        const lines = fs.readFileSync(envPath, 'utf-8').split('\n');
+        lines.forEach(line => {
+            const trimmed = line.trim();
+            if (trimmed && !trimmed.startsWith('#') && trimmed.includes('=')) {
+                const [k, v] = trimmed.split('=', 2);
+                config[k.trim()] = v.trim();
+            }
+        });
+    }
+    return config;
+}
+
+// Helper to write/update .env key=values
+function saveEnv(updates) {
+    const envPath = path.join(__dirname, '.env');
+    const current = loadEnv();
+    const merged = { ...current, ...updates };
+    const lines = Object.entries(merged).map(([k, v]) => `${k}=${v}`);
+    fs.writeFileSync(envPath, lines.join('\n'), 'utf-8');
+}
+
 // API: Config Info
 app.get('/api/config', (req, res) => {
-    res.json({ projectPath: __dirname });
+    const envConfig = loadEnv();
+    
+    // Resolve Steam content directory dynamically (cross-platform relative folder fallback)
+    let steamContentDir = envConfig.STEAM_CONTENT_DIR || '';
+    if (!steamContentDir) {
+        if (process.platform === 'win32') {
+            steamContentDir = 'C:\\Program Files (x86)\\Steam\\steamapps\\workshop\\content\\616720';
+        } else {
+            const home = process.env.HOME || process.env.USERPROFILE || '';
+            steamContentDir = path.join(home, 'Library', 'Application Support', 'Steam', 'steamapps', 'workshop', 'content', '616720');
+        }
+    }
+    
+    res.json({ 
+        projectPath: __dirname,
+        steamContentDir: steamContentDir,
+        storageRoot: envConfig.STORAGE_ROOT || 'E:\\lpk-studio-storage',
+        maxSizeGB: envConfig.MAX_SIZE_GB || '1.5'
+    });
+});
+
+// API: Save Config Info
+app.post('/api/config', (req, res) => {
+    try {
+        const { steamContentDir, storageRoot, maxSizeGB } = req.body;
+        const updates = {};
+        if (steamContentDir !== undefined) updates.STEAM_CONTENT_DIR = steamContentDir;
+        if (storageRoot !== undefined) updates.STORAGE_ROOT = storageRoot;
+        if (maxSizeGB !== undefined) updates.MAX_SIZE_GB = maxSizeGB;
+        
+        saveEnv(updates);
+        res.json({ success: true, message: 'Settings configuration saved successfully!' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // Download endpoints for packages
