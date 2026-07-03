@@ -21,8 +21,25 @@ else:
     LIVE2D_DIR = os.path.join(BASE_DIR, "packages_live2d")
     SPINE_DIR = os.path.join(BASE_DIR, "packages_spine")
 
+# Helper to read basic key=values from .env if present
+def load_env_vars():
+    env_vars = {}
+    env_path = os.path.join(os.path.dirname(BASE_DIR), ".env")
+    if os.path.exists(env_path):
+        with open(env_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    k, v = line.split('=', 1)
+                    env_vars[k.strip()] = v.strip()
+    return env_vars
+
+env_config = load_env_vars()
+
 # Resolve Steam content directory dynamically (cross-platform relative folder fallback)
-if os.name == 'nt':
+if env_config.get("STEAM_CONTENT_DIR"):
+    STEAM_CONTENT_DIR = env_config.get("STEAM_CONTENT_DIR")
+elif os.name == 'nt':
     STEAM_CONTENT_DIR = r"C:\Program Files (x86)\Steam\steamapps\workshop\content\616720"
 else:
     home = os.path.expanduser("~")

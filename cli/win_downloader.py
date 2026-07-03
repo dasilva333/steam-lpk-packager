@@ -67,13 +67,28 @@ def download_batch(items_to_download):
         if process.stderr:
             lf.write("\n--- STDERR ---\n" + process.stderr)
 
+    # Helper to parse .env file
+    env_vars = {}
+    env_path = os.path.join(BASE_DIR, ".env")
+    if os.path.exists(env_path):
+        with open(env_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    k, v = line.split('=', 1)
+                    env_vars[k.strip()] = v.strip()
+
     # Paths where steamcmd might have saved the downloaded workshop contents
-    paths_to_check = [
+    paths_to_check = []
+    if env_vars.get("STEAM_CONTENT_DIR"):
+        paths_to_check.append(env_vars.get("STEAM_CONTENT_DIR"))
+        
+    paths_to_check.extend([
         os.path.join(BASE_DIR, "steamcmd", "steamapps", "workshop", "content", "616720"),
         os.path.expandvars(r"%LOCALAPPDATA%\VirtualStore\Program Files (x86)\Steam\steamapps\workshop\content\616720"),
         r"C:\steamcmd\steamapps\workshop\content\616720",
         r"C:\Program Files (x86)\Steam\steamapps\workshop\content\616720",
-    ]
+    ])
     
     # Process files downloaded by the script
     moved_count = 0
