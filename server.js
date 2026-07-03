@@ -268,10 +268,11 @@ app.get('/api/config', (req, res) => {
         }
     }
     
+    const defaultStorageRoot = path.join(__dirname, 'storage');
     res.json({ 
         projectPath: __dirname,
         steamContentDir: steamContentDir,
-        storageRoot: envConfig.STORAGE_ROOT || 'E:\\lpk-studio-storage',
+        storageRoot: envConfig.STORAGE_ROOT || defaultStorageRoot,
         maxSizeGB: envConfig.MAX_SIZE_GB || '1.5'
     });
 });

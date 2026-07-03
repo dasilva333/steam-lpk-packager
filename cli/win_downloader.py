@@ -8,9 +8,32 @@ import shutil
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(BASE_DIR, 'db', 'catalog.sqlite')
-STORAGE_DIR = "E:\\lpk-studio-storage"
+
+# Helper to read basic key=values from .env if present
+def load_env_config():
+    env_vars = {}
+    env_path = os.path.join(BASE_DIR, ".env")
+    if os.path.exists(env_path):
+        with open(env_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    k, v = line.split('=', 1)
+                    env_vars[k.strip()] = v.strip()
+    return env_vars
+
+env_cfg = load_env_config()
+
+default_storage = os.path.join(BASE_DIR, "storage")
+STORAGE_DIR = env_cfg.get("STORAGE_ROOT", default_storage)
 CACHE_DIR = os.path.join(STORAGE_DIR, "workshop_cache")
-MAX_SIZE = 1.5 * 1024 * 1024 * 1024  # 1.5 GB
+
+try:
+    max_size_gb = float(env_cfg.get("MAX_SIZE_GB", "1.5"))
+except:
+    max_size_gb = 1.5
+
+MAX_SIZE = max_size_gb * 1024 * 1024 * 1024  # Size threshold in bytes
 BATCH_SIZE = 50  # Number of workshop downloads in a single steamcmd script session
 
 def get_connection():
