@@ -11,30 +11,38 @@ DB_PATH = os.path.join(BASE_DIR, 'db', 'catalog.sqlite')
 STORAGE_DIR = "E:\\lpk-studio-storage"
 CACHE_DIR = os.path.join(STORAGE_DIR, "workshop_cache")
 MAX_SIZE = 1.5 * 1024 * 1024 * 1024  # 1.5 GB
+BATCH_SIZE = 50  # Number of workshop downloads in a single steamcmd script session
 
 def get_connection():
     return sqlite3.connect(DB_PATH)
 
-def download_item(item_id):
-    os.makedirs(CACHE_DIR, exist_ok=True)
-    item_dir = os.path.join(CACHE_DIR, item_id)
-    
-    if os.path.exists(item_dir) and len(os.listdir(item_dir)) > 0:
-        return True, "Already downloaded"
+def download_batch(items_to_download):
+    """
+    Downloads multiple items in a single steamcmd session using +runscript to save login/update overhead.
+    """
+    if not items_to_download:
+        return True, "No items in batch"
         
-    print(f"Downloading {item_id} via local steamcmd...")
-    
-    # Resolve the local steamcmd relative binary
+    os.makedirs(CACHE_DIR, exist_ok=True)
     steamcmd_exe = os.path.join(BASE_DIR, "steamcmd", "steamcmd.exe")
     if not os.path.exists(steamcmd_exe):
         return False, f"Local steamcmd.exe not found at: {steamcmd_exe}"
         
-    cmd = f'"{steamcmd_exe}" +login anonymous +workshop_download_item 616720 {item_id} +quit'
+    # Write a steamcmd batch download script
+    script_path = os.path.join(BASE_DIR, "steamcmd", "download_script.txt")
+    with open(script_path, "w", encoding="utf-8") as f:
+        f.write("login anonymous\n")
+        for item_id in items_to_download:
+            f.write(f"workshop_download_item 616720 {item_id}\n")
+        f.write("quit\n")
+        
+    print(f"Executing batch SteamCMD download script for {len(items_to_download)} items...")
     
-    # Run steamcmd and track output
-    process = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+    cmd = f'"{steamcmd_exe}" +runscript download_script.txt'
+    # Run the script via steamcmd
+    process = subprocess.run(cmd, shell=True, capture_output=True, text=True, cwd=os.path.join(BASE_DIR, "steamcmd"))
     
-    # On Windows, local steamcmd downloads to: steam-lpk-packager\steamcmd\steamapps\workshop\content\616720\<id>
+    # Paths where steamcmd might have saved the downloaded workshop contents
     paths_to_check = [
         os.path.join(BASE_DIR, "steamcmd", "steamapps", "workshop", "content", "616720"),
         os.path.expandvars(r"%LOCALAPPDATA%\VirtualStore\Program Files (x86)\Steam\steamapps\workshop\content\616720"),
@@ -42,27 +50,39 @@ def download_item(item_id):
         r"C:\Program Files (x86)\Steam\steamapps\workshop\content\616720",
     ]
     
-    source_dir = None
-    for p in paths_to_check:
-        test_path = os.path.join(p, item_id)
-        if os.path.exists(test_path) and len(os.listdir(test_path)) > 0:
-            source_dir = test_path
-            break
+    # Process files downloaded by the script
+    moved_count = 0
+    for item_id in items_to_download:
+        item_dir = os.path.join(CACHE_DIR, item_id)
+        if os.path.exists(item_dir) and len(os.listdir(item_dir)) > 0:
+            continue
             
-    if source_dir:
-        # Move it to our clean E drive cache storage
-        shutil.move(source_dir, item_dir)
-        return True, "Download successful"
-    else:
-        # Check process output for error logs
-        if "failed" in process.stdout.lower() or "error" in process.stdout.lower():
-            # Extract last line or error snippet
-            err_lines = [l.strip() for l in process.stdout.split('\n') if l.strip()]
-            err_msg = err_lines[-1] if err_lines else "Unknown steamcmd failure"
-            return False, f"SteamCMD Error: {err_msg}"
-        return False, "Download folder not found"
+        source_dir = None
+        for p in paths_to_check:
+            test_path = os.path.join(p, item_id)
+            if os.path.exists(test_path) and len(os.listdir(test_path)) > 0:
+                source_dir = test_path
+                break
+                
+        if source_dir:
+            os.makedirs(item_dir, exist_ok=True)
+            # Move contents to clean E drive cache storage
+            for fname in os.listdir(source_dir):
+                shutil.move(os.path.join(source_dir, fname), os.path.join(item_dir, fname))
+            try:
+                shutil.rmtree(source_dir)
+            except:
+                pass
+            moved_count += 1
             
-
+    # Remove the temporary runscript file
+    if os.path.exists(script_path):
+        try:
+            os.remove(script_path)
+        except:
+            pass
+            
+    return True, f"Batch complete. Successfully acquired {moved_count}/{len(items_to_download)} new items."
 
 def start_download_phase():
     conn = get_connection()
@@ -83,34 +103,35 @@ def start_download_phase():
     print(f"Loaded {total} targets for download phase (Live2D & Spine <= 1.5GB)")
     print("=" * 60)
     
-    success_count = 0
-    failed_count = 0
+    # Build list of items that actually need to be downloaded
+    pending_ids = []
     skipped_count = 0
     
-    for idx, (item_id, title, size, m_type) in enumerate(items, 1):
-        size_mb = size / (1024 * 1024)
-        print(f"[{idx}/{total}] Processing {item_id} ({m_type} | {size_mb:.2f} MB) - '{title[:30]}'")
-        
-        try:
-            success, message = download_item(item_id)
-            if success:
-                if message == "Already downloaded":
-                    skipped_count += 1
-                else:
-                    success_count += 1
-                print(f"  ✅ {message}")
-            else:
-                failed_count += 1
-                print(f"  ❌ {message}")
-        except Exception as e:
-            failed_count += 1
-            print(f"  ❌ Error: {str(e)}")
+    for item_id, title, size, m_type in items:
+        item_dir = os.path.join(CACHE_DIR, item_id)
+        if os.path.exists(item_dir) and len(os.listdir(item_dir)) > 0:
+            skipped_count += 1
+        else:
+            pending_ids.append(item_id)
             
-        # Give Steam connection a minor breathing delay
-        time.sleep(1)
+    print(f"Already cached: {skipped_count} | To download: {len(pending_ids)}")
+    print("=" * 60)
+    
+    # Process pending items in chunked batches
+    for i in range(0, len(pending_ids), BATCH_SIZE):
+        batch = pending_ids[i:i + BATCH_SIZE]
+        print(f"Processing Batch {i//BATCH_SIZE + 1} ({len(batch)} items)...")
+        try:
+            success, msg = download_batch(batch)
+            print(f"  {msg}")
+        except Exception as e:
+            print(f"  ❌ Batch Execution Error: {str(e)}")
+            
+        # Give SteamCmd a small delay between session scripts to avoid socket throttling
+        time.sleep(2)
         
     print("=" * 60)
-    print(f"Download Phase finished! Success: {success_count} | Skipped: {skipped_count} | Failed: {failed_count}")
+    print("Download Phase finished!")
     print("=" * 60)
 
 if __name__ == '__main__':
