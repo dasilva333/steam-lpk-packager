@@ -14,5 +14,3 @@ public/thumbnails/bad_detected/*
 db/catalog.sqlite
 steamcmd.zip
 public/thumbnails/*.png
-!public/thumbnails/fixed/
-!public/thumbnails/bad_detected/
