@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const { spawn } = require('child_process');
 const path = require('path');
@@ -291,6 +292,72 @@ app.post('/api/config', (req, res) => {
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
+});
+
+// API: Detect if a single thumbnail is bad (fast PIL check)
+// GET /api/detect-thumbnail?workshopId=3709978268
+app.get('/api/detect-thumbnail', async (req, res) => {
+    const { workshopId } = req.query;
+    if (!workshopId) return res.status(400).json({ error: 'workshopId required' });
+
+    const envConfig = loadEnv();
+    const storageDir = envConfig.STORAGE_DIR || 'E:\\lpk-studio-storage';
+    const workshopDir = path.join(storageDir, 'workshop_cache', workshopId);
+
+    if (!fs.existsSync(workshopDir)) {
+        return res.status(404).json({ error: `Workshop dir not found: ${workshopDir}` });
+    }
+
+    const pngs = fs.readdirSync(workshopDir).filter(f => f.endsWith('.png'));
+    if (pngs.length === 0) {
+        return res.json({ workshopId, result: 'NO_THUMBNAIL' });
+    }
+
+    const thumbPath = path.join(workshopDir, pngs[0]);
+    const cmdBinary = process.platform === 'win32' ? 'py' : 'python3';
+    const detectScript = path.join(__dirname, 'cli', 'detect_thumbnail.py');
+
+    const child = spawn(cmdBinary, [detectScript, thumbPath]);
+    let stdout = '';
+    child.stdout.on('data', d => { stdout += d.toString(); });
+    child.on('close', () => {
+        const verdict = stdout.trim(); // "BAD" or "OK"
+        res.json({ workshopId, thumbnail: pngs[0], result: verdict });
+    });
+});
+
+// API: Regenerate thumbnail for a single workshop item (streams progress via SSE)
+// POST /api/regenerate-thumbnail  { "workshopId": "3709978268" }
+app.post('/api/regenerate-thumbnail', (req, res) => {
+    const { workshopId, dryRun } = req.body;
+    if (!workshopId) return res.status(400).json({ error: 'workshopId required' });
+
+    // Set up SSE
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
+    const sendSSE = (event, data) => {
+        res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    };
+
+    const cmdBinary = process.platform === 'win32' ? 'py' : 'python3';
+    const regenScript = path.join(__dirname, 'cli', 'regenerate_thumbnails.py');
+    const regenArgs = [regenScript, '--workshop-id', workshopId, '--verbose'];
+    if (dryRun) regenArgs.push('--dry-run');
+
+    const env = { ...process.env, PYTHONUTF8: '1' };
+    const child = spawn(cmdBinary, regenArgs, { env });
+
+    sendSSE('start', { workshopId, dryRun: !!dryRun });
+
+    child.stdout.on('data', d => sendSSE('stdout', d.toString()));
+    child.stderr.on('data', d => sendSSE('stderr', d.toString()));
+    child.on('close', code => {
+        sendSSE('exit', { code });
+        res.end();
+    });
 });
 
 // Download endpoints for packages

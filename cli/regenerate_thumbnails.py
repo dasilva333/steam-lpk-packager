@@ -207,8 +207,41 @@ def process_item(workshop_id: str, dry_run: bool = False, verbose: bool = False)
     shutil.copy2(thumbnail_path, os.path.join(bad_detected_dir, f"{workshop_id}.png"))
     print(f"  [{workshop_id}] Copied original bad thumbnail to public/thumbnails/bad_detected/ for review.")
 
-    # Short-circuit: Skip decryption and rendering for now to focus on detection
-    return "ok"
+    if dry_run:
+        print(f"  [{workshop_id}] [DRY RUN] Would regenerate thumbnail.")
+        return "ok"
+
+    # Find or create decrypted model in workshop_cache
+    workshop_dir = os.path.join(WORKSHOP_CACHE, workshop_id)
+    if not os.path.isdir(workshop_dir):
+        print(f"  [{workshop_id}] [ERROR] Workshop directory not found in cache: {workshop_dir}")
+        return "no_model"
+
+    model_json = find_decrypted_model(workshop_dir)
+    if not model_json:
+        print(f"  [{workshop_id}] Not yet decrypted - attempting decryption...")
+        model_json = decrypt_lpk(workshop_dir, verbose=verbose)
+
+    if not model_json:
+        print(f"  [{workshop_id}] [ERROR] Could not find/decrypt model - skipping.")
+        return "no_model"
+
+    # Make the printed path ASCII-safe to prevent charmap errors on Windows CMD
+    safe_path = model_json.encode('ascii', errors='replace').decode('ascii')
+    print(f"  [{workshop_id}] Model: {safe_path}")
+
+    # Determine the public review folder target
+    fixed_dir = os.path.join(PROJECT_ROOT, "public", "thumbnails", "fixed")
+    os.makedirs(fixed_dir, exist_ok=True)
+    target_output = os.path.join(fixed_dir, f"{workshop_id}.png")
+
+    # Render directly to public/thumbnails/fixed/<workshop_id>.png
+    success = render_thumbnail(model_json, target_output, verbose=verbose)
+
+    if not success:
+        if os.path.exists(target_output):
+            os.remove(target_output)
+        return "render_failed"
 
     print(f"  [{workshop_id}] [OK] Rendered replacement thumbnail to public/thumbnails/fixed/!")
     return "ok"
