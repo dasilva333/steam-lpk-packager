@@ -103,30 +103,38 @@ def process_item(item_id):
     # We will invoke the existing batch_extract_models.py inside cli/ to handle format standardization
     print(f"Running batch_extract_models for {item_id}...")
     
-    # We will copy the item folder temporarily to the cli/packages directory so the legacy script can process it
+    # We create a Directory Junction from E: to C: instead of copying files.
+    # This prevents any C: disk space usage during the run.
     legacy_packages_dir = os.path.join(BASE_DIR, "cli", "packages")
     os.makedirs(legacy_packages_dir, exist_ok=True)
     temp_target = os.path.join(legacy_packages_dir, item_id)
     
     if os.path.exists(temp_target):
-        shutil.rmtree(temp_target)
-    shutil.copytree(item_dir, temp_target)
+        # Remove existing symlink/junction
+        if os.path.isdir(temp_target):
+            subprocess.run(f'rmdir "{temp_target}"', shell=True)
+        else:
+            os.remove(temp_target)
+
+    # Create Windows directory junction (mklink /J)
+    # mklink requires paths with backslashes
+    src_dir = item_dir.replace("/", "\\")
+    dst_dir = temp_target.replace("/", "\\")
+    subprocess.run(f'mklink /J "{dst_dir}" "{src_dir}"', shell=True, capture_output=True)
     
     # Run the legacy python extractor
     # Explicitly run under the relative cli directory where batch_extract_models expects its paths
     cmd = f'py batch_extract_models.py'
     subprocess.run(cmd, shell=True, cwd=os.path.join(BASE_DIR, "cli"))
     
-    # Clean up temp package folder
+    # Clean up temp package junction link safely
     if os.path.exists(temp_target):
         for _ in range(5):
             try:
-                shutil.rmtree(temp_target)
+                subprocess.run(f'rmdir "{temp_target.replace("/", "\\")}"', shell=True)
                 break
-            except PermissionError:
-                time.sleep(0.5)
             except Exception:
-                break
+                time.sleep(0.5)
         
     # 4. Check outputs inside cli/live2d_packages or cli/spine_packages
     live2d_zip = os.path.join(BASE_DIR, "cli", "live2d_packages", f"live2d_{item_id}.zip")
