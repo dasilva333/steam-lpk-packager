@@ -158,6 +158,15 @@
                                 <option value="size">File Size</option>
                             </select>
                         </div>
+                        <div class="filter-group select-group">
+                            <label class="filter-label">Show:</label>
+                            <select v-model="catalogFilters.limit" @change="resetPageAndFetch" class="custom-select">
+                                <option :value="12">12 per page</option>
+                                <option :value="48">48 per page</option>
+                                <option :value="96">96 per page</option>
+                                <option :value="192">192 per page</option>
+                            </select>
+                        </div>
                     </div>
 
                     <div class="filter-row checkboxes-row">
