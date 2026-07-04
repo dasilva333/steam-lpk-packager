@@ -21,9 +21,9 @@ def safe_mkdir(s: str):
     """
     Safely create a directory
     """
-    # Create the directory
     os.makedirs(s, exist_ok=True)
-    print(f"Created directory: {s}")
+    safe_dir = s.encode('ascii', errors='replace').decode('ascii')
+    print(f"Created directory: {safe_dir}")
 
 def genkey(s: str) -> int:
     ret = 0

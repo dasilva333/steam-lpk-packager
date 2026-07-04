@@ -80,11 +80,12 @@ class LpkLoader():
                     subdir = os.path.join(outputdir, os.path.dirname(file))
                     outputFilePath = os.path.join(subdir, os.path.basename(file))
                     safe_mkdir(subdir)
+                    safe_path = outputFilePath.encode('ascii', errors='replace').decode('ascii')
                     if os.path.splitext(file)[-1] in [".json", ".mlve", ".txt"]:
-                        print(f"Extracting {file} -> {outputFilePath}")
+                        print(f"Extracting {file} -> {safe_path}")
                         self.lpkfile.extract(file, outputdir)
                     else:
-                        print(f"Decrypting {file} -> {outputFilePath}")
+                        print(f"Decrypting {file} -> {safe_path}")
                         decryptedData = self.decrypt_file(file)
                         with open(outputFilePath, "wb") as outputFile:
                             outputFile.write(decryptedData)
@@ -195,7 +196,8 @@ class LpkLoader():
     def recovery(self, filename, output) -> Tuple[bytes, str]:
         ret = self.decrypt_file(filename)
         suffix = guess_type(ret)
-        print(f"recovering {filename} -> {output+suffix}")
+        safe_out = (output+suffix).encode('ascii', errors='replace').decode('ascii')
+        print(f"recovering {filename} -> {safe_out}")
         open(output + suffix, "wb").write(ret)
         return ret, suffix
 
