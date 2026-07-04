@@ -126,8 +126,8 @@ for item in items:
     # 3. Check format
     moc3_files = glob.glob(os.path.join(model_dir, "*.moc3"))
     moc_files = glob.glob(os.path.join(model_dir, "*.moc"))
-    skel_files = glob.glob(os.path.join(model_dir, "*.skel")) or glob.glob(os.path.join(model_dir, "skeleton_0"))
-    atlas_files = glob.glob(os.path.join(model_dir, "*.atlas")) + glob.glob(os.path.join(model_dir, "*.atlas.txt")) or glob.glob(os.path.join(model_dir, "atlases_0_atlas_0"))
+    skel_files = glob.glob(os.path.join(model_dir, "*.skel")) or glob.glob(os.path.join(model_dir, "skeleton_*"))
+    atlas_files = glob.glob(os.path.join(model_dir, "*.atlas")) + glob.glob(os.path.join(model_dir, "*.atlas.txt")) or glob.glob(os.path.join(model_dir, "atlases_*_atlas_*"))
     
     if moc3_files or moc_files:
         print(f"Detected Live2D model for {basename}!")

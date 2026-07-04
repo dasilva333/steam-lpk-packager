@@ -21,3 +21,7 @@ The following Spine models were detected as incompatible (Spine 3.x or 2.x, whic
 | spine_2761394379 | 3.8.75 | Purged & Deleted | 2026-06-27 |
 | spine_2791274756 | 3.8.96 | Purged & Deleted | 2026-06-27 |
 | spine_2790530599 | 3.8.75 | Purged & Deleted | 2026-06-27 |
+| spine_3532970933 | 3.8.99 | Purged & Deleted | 2026-07-03 |
+| spine_3717458266 | 3.8.99 | Purged & Deleted | 2026-07-03 |
+| spine_3755643120 | 3.8.99 | Purged & Deleted | 2026-07-03 |
+| spine_3408981961 | 3.8.75 | Purged & Deleted | 2026-07-03 |

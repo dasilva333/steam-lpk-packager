@@ -115,7 +115,11 @@ def is_processed(item_id):
 def run_command(cmd, cwd=BASE_DIR):
     """Helper to run a shell command and return stdout/stderr."""
     print(f"  [RUN] Running: {cmd} inside {os.path.basename(cwd)}")
-    result = subprocess.run(cmd, shell=True, cwd=cwd, capture_output=True, text=True)
+    child_env = os.environ.copy()
+    child_env["PYTHONIOENCODING"] = "utf-8"
+    child_env["PYTHONUTF8"] = "1"
+    result = subprocess.run(cmd, shell=True, cwd=cwd, capture_output=True, text=True,
+                             encoding="utf-8", errors="replace", env=child_env)
     return result.returncode, result.stdout, result.stderr
 
 def process_item(item_id):
@@ -166,6 +170,7 @@ def process_item(item_id):
     if code != 0:
         print(f"  [WARNING] verify_spine_versions returned code {code}")
         print(f"  STDOUT: {stdout}")
+        print(f"  STDERR: {stderr}")
 
     # 5. Manual cleanup of packages_lpk folder (since verify_spine_versions only cleans Spine folders)
     if os.path.exists(dest_dir):

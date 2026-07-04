@@ -1,3 +1,4 @@
+import glob
 import json
 import os.path
 import re
@@ -269,31 +270,57 @@ def SetupModel(model_dir: str, modelNameBase: str = None):
 def SetupSpineModel(model_dir: str):
     """
     Renames spine files after extraction:
-    - skeleton_0 -> skeleton_0.skel
-    - atlases_0_atlas_0 -> skeleton_0.atlas.txt
-    - each texture in 'textures' -> corresponding name in 'tex_names' from model0.json
+    - skeleton_N -> skeleton_0.skel (N is whatever index this package used, not always 0)
+    - atlases_M_atlas_N -> skeleton_0.atlas.txt
+    - each texture in 'textures' -> corresponding name in 'tex_names' from the model json
     """
-    # Rename skeleton file
-    skeleton_path = os.path.join(model_dir, "skeleton_0")
-    if os.path.exists(skeleton_path):
+    # Find the model json first (model0.json normally, but fall back to any modelN.json),
+    # since it tells us the *actual* skeleton/atlas filenames this package used.
+    model_json_path = os.path.join(model_dir, "model0.json")
+    if not os.path.exists(model_json_path):
+        model_json_candidates = sorted(glob.glob(os.path.join(model_dir, "model*.json")))
+        if model_json_candidates:
+            model_json_path = model_json_candidates[0]
+
+    skeleton_name = None
+    atlas_name = None
+    if os.path.exists(model_json_path):
+        with open(model_json_path, "r", encoding="utf-8") as f:
+            model_json = json.load(f)
+        skeleton_name = model_json.get("skeleton")
+        if isinstance(model_json.get("atlases"), list) and model_json["atlases"]:
+            atlas_name = model_json["atlases"][0].get("atlas")
+
+    # Rename skeleton file (prefer the name declared in the model json; fall back to
+    # scanning for any skeleton_N file, since package asset indices aren't always 0)
+    skeleton_path = os.path.join(model_dir, skeleton_name) if skeleton_name else None
+    if not skeleton_path or not os.path.exists(skeleton_path):
+        candidates = glob.glob(os.path.join(model_dir, "skeleton_*"))
+        skeleton_path = candidates[0] if candidates else None
+    if skeleton_path and os.path.exists(skeleton_path):
         new_skel_path = os.path.join(model_dir, "skeleton_0.skel")
         os.rename(skeleton_path, new_skel_path)
-        Log(f"Renamed skeleton: skeleton_0 -> skeleton_0.skel")
+        Log(f"Renamed skeleton: {os.path.basename(skeleton_path)} -> skeleton_0.skel")
 
     # Rename atlas file
-    atlas_candidates = ["atlases_0_atlas_0", "skeleton_0.atlas", "skeleton_0.atlas.txt", "atlas"]
+    atlas_candidates = [atlas_name] if atlas_name else []
+    atlas_candidates += ["atlases_0_atlas_0", "skeleton_0.atlas", "skeleton_0.atlas.txt", "atlas"]
     atlas_file = None
-    for fname in os.listdir(model_dir):
-        if fname in atlas_candidates:
-            atlas_file = fname
+    dir_listing = os.listdir(model_dir)
+    for candidate in atlas_candidates:
+        if candidate in dir_listing:
+            atlas_file = candidate
             break
+    if not atlas_file:
+        candidates = glob.glob(os.path.join(model_dir, "atlases_*_atlas_*"))
+        if candidates:
+            atlas_file = os.path.basename(candidates[0])
     if atlas_file:
         new_atlas_path = os.path.join(model_dir, "skeleton_0.atlas.txt")
         os.rename(os.path.join(model_dir, atlas_file), new_atlas_path)
         Log(f"Renamed atlas: {atlas_file} -> skeleton_0.atlas.txt")
 
-    # Rename texture files using 'tex_names' from model0.json
-    model_json_path = os.path.join(model_dir, "model0.json")
+    # Rename texture files using 'tex_names' from the model json
     if os.path.exists(model_json_path):
         with open(model_json_path, "r", encoding="utf-8") as f:
             model_json = json.load(f)
