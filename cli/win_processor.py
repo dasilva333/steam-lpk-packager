@@ -143,7 +143,7 @@ def process_item(item_id):
         if lpk_files:
             try:
                 os.remove(lpk_files[0])
-                print(f"  [{item_id}] 🧹 [DELETE] Removed source LPK file: {os.path.basename(lpk_files[0])}")
+                print(f"  [{item_id}] [DELETE] Removed source LPK file: {os.path.basename(lpk_files[0])}")
             except Exception as e:
                 print(f"  [{item_id}] [WARNING] Failed to remove source LPK file: {e}")
         
