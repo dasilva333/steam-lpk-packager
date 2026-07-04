@@ -4,9 +4,13 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import time
 import urllib.parse
 import urllib.request
+
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
 # Detect if running in steam-lpk-packager repo or personal_airi
 current_dir = os.path.dirname(os.path.abspath(__file__))

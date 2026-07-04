@@ -3,3 +3,4 @@ node_modules/
 temp_gui_batch.txt
 temp_download_batch.txt
 .DS_Store
+*.zip
