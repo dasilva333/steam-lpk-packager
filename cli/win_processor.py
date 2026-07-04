@@ -136,9 +136,8 @@ def process_item(item_id):
             except Exception:
                 time.sleep(0.5)
         
-    # 4. Check outputs inside cli/live2d_packages or cli/spine_packages
-    live2d_zip = os.path.join(BASE_DIR, "cli", "live2d_packages", f"live2d_{item_id}.zip")
-    spine_zip = os.path.join(BASE_DIR, "cli", "spine_packages", f"spine_{item_id}.zip")
+    # 4. Check outputs inside workshop_cache/<item_id>/decrypted/
+    decrypted_dir = os.path.join(CACHE_DIR, item_id, "decrypted")
     
     packaged = 0
     steam_type = "Other"
@@ -147,18 +146,24 @@ def process_item(item_id):
     compatible = None
     compat_reason = None
     
-    if os.path.exists(live2d_zip):
-        packaged = 1
-        steam_type = "Live2D"
-        # We assume compatible unless verify_spine_versions or render failure flags it
-        compatible = 1
-        cubism_ver = "3.x-4.x" # Default range detected
-    elif os.path.exists(spine_zip):
-        packaged = 1
-        steam_type = "Spine"
-        compatible = 1
-        spine_ver = "4.x"
-    else:
+    if os.path.isdir(decrypted_dir):
+        # Scan for format indicators inside the decrypted folders
+        moc3_files = glob.glob(os.path.join(decrypted_dir, "**", "*.moc3"), recursive=True)
+        moc_files = glob.glob(os.path.join(decrypted_dir, "**", "*.moc"), recursive=True)
+        skel_files = glob.glob(os.path.join(decrypted_dir, "**", "*.skel"), recursive=True) or glob.glob(os.path.join(decrypted_dir, "**", "skeleton_0"), recursive=True)
+        
+        if moc3_files or moc_files:
+            packaged = 1
+            steam_type = "Live2D"
+            compatible = 1
+            cubism_ver = "3.x-4.x"
+        elif skel_files:
+            packaged = 1
+            steam_type = "Spine"
+            compatible = 1
+            spine_ver = "4.x"
+            
+    if not packaged:
         # Check if it was flagged as incompatible Spine model
         incompatible_log = os.path.join(BASE_DIR, "cli", "spine_packages", "incompatible_spine_models.md")
         if os.path.exists(incompatible_log):

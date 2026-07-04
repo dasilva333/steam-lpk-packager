@@ -23,14 +23,27 @@ class ConsoleLogger:
 
 manager.LogArea = ConsoleLogger()
 
-packages_dir = os.path.join(base_dir, "packages")
-output_dir = os.path.join(base_dir, "live2d_packages")
-temp_dir = os.path.join(base_dir, "temp_extract")
-spine_output_dir = os.path.join(base_dir, "spine_packages")
+# Helper to read basic key=values from .env if present
+def load_env_config():
+    env_vars = {}
+    project_root = os.path.dirname(base_dir)
+    env_path = os.path.join(project_root, ".env")
+    if os.path.exists(env_path):
+        with open(env_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    k, v = line.split('=', 1)
+                    env_vars[k.strip()] = v.strip()
+    return env_vars
 
-if not os.path.exists(output_dir):
-    os.makedirs(output_dir)
-    print(f"Created output dir: {output_dir}")
+env_cfg = load_env_config()
+default_storage = os.path.join(os.path.dirname(base_dir), "storage")
+STORAGE_DIR = env_cfg.get("STORAGE_DIR", default_storage)
+CACHE_DIR = os.path.join(STORAGE_DIR, "workshop_cache")
+
+packages_dir = os.path.join(base_dir, "packages")
+temp_dir = os.path.join(base_dir, "temp_extract")
 
 # Find all items (zips and folders)
 items = glob.glob(os.path.join(packages_dir, "*"))
@@ -42,14 +55,12 @@ for item in items:
         continue
         
     print(f"\nProcessing {basename}...")
+
+    # Target decrypted storage directory in workshop_cache on E:
+    decrypted_dir = os.path.join(CACHE_DIR, basename, "decrypted")
     
-    # Skip if already processed
-    zip_output_path_live2d = os.path.join(output_dir, f"live2d_{basename}.zip")
-    zip_output_path_spine = os.path.join(spine_output_dir, f"spine_{basename}.zip")
-    zip_output_path_failing = os.path.join(output_dir, "failing_to_render", f"live2d_{basename}.zip")
-    
-    if os.path.exists(zip_output_path_live2d) or os.path.exists(zip_output_path_spine) or os.path.exists(zip_output_path_failing):
-        print(f"Output already exists for {basename}. Skipping.")
+    if os.path.exists(decrypted_dir) and len(os.listdir(decrypted_dir)) > 0:
+        print(f"Decrypted folder already exists for {basename}. Skipping.")
         continue
         
     # Setup paths for extraction
@@ -199,17 +210,14 @@ for item in items:
             except Exception as e:
                 print(f"[WARNING] Failed to clean up model JSON references: {e}")
             
-        # Zip the contents
+        # Move the standardized folder to the E: drive decrypted folder
         try:
-            with zipfile.ZipFile(zip_output_path_live2d, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                for root, dirs, files in os.walk(model_dir):
-                    for file in files:
-                        file_path = os.path.join(root, file)
-                        arcname = os.path.relpath(file_path, model_dir)
-                        zipf.write(file_path, arcname)
-            print(f"Successfully packaged {basename} to {zip_output_path_live2d}")
+            if os.path.exists(decrypted_dir):
+                shutil.rmtree(decrypted_dir)
+            shutil.copytree(model_dir, decrypted_dir)
+            print(f"Successfully decrypted & saved Live2D folder for {basename} to E: storage.")
         except Exception as e:
-            print(f"Failed to create zip for {basename}: {e}")
+            print(f"Failed to copy decrypted folder for {basename}: {e}")
             
     elif skel_files or atlas_files:
         print(f"Detected Spine model for {basename}!")
@@ -218,20 +226,14 @@ for item in items:
         except Exception as e:
             print(f"SetupSpineModel failed for {basename}: {e} (Continuing anyway)")
             
-        if not os.path.exists(spine_output_dir):
-            os.makedirs(spine_output_dir)
-            
-        # Zip the contents
+        # Move the standardized folder to the E: drive decrypted folder
         try:
-            with zipfile.ZipFile(zip_output_path_spine, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                for root, dirs, files in os.walk(model_dir):
-                    for file in files:
-                        file_path = os.path.join(root, file)
-                        arcname = os.path.relpath(file_path, model_dir)
-                        zipf.write(file_path, arcname)
-            print(f"Successfully packaged {basename} to {zip_output_path_spine}")
+            if os.path.exists(decrypted_dir):
+                shutil.rmtree(decrypted_dir)
+            shutil.copytree(model_dir, decrypted_dir)
+            print(f"Successfully decrypted & saved Spine folder for {basename} to E: storage.")
         except Exception as e:
-            print(f"Failed to create zip for {basename}: {e}")
+            print(f"Failed to copy decrypted folder for {basename}: {e}")
     else:
         print(f"{basename} is not Live2D or Spine. Skipping.")
 
