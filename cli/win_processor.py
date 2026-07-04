@@ -197,7 +197,7 @@ def process_item(item_id):
     
     return True, f"Processed {steam_type} | Compat: {compatible} | Packaged: {packaged}"
 
-def start_processing_phase():
+def start_processing_phase(specific_id=None):
     # Find all downloaded folders that are not yet fingerprinted in SQLite
     conn = get_connection()
     cursor = conn.cursor()
@@ -209,8 +209,11 @@ def start_processing_phase():
         print("Workshop cache is empty.")
         return
         
-    downloaded_ids = os.listdir(CACHE_DIR)
-    targets = [fid for fid in downloaded_ids if fid in db_ids]
+    if specific_id:
+        targets = [specific_id]
+    else:
+        downloaded_ids = os.listdir(CACHE_DIR)
+        targets = [fid for fid in downloaded_ids if fid in db_ids]
     
     print(f"Found {len(targets)} downloaded items ready for extraction processing")
     print("=" * 60)
@@ -229,6 +232,7 @@ def start_processing_phase():
 
 if __name__ == '__main__':
     if len(sys.argv) > 1 and sys.argv[1] == 'process':
-        start_processing_phase()
+        specific = sys.argv[2] if len(sys.argv) > 2 else None
+        start_processing_phase(specific)
     else:
-        print("Usage: py cli/win_processor.py process")
+        print("Usage: py cli/win_processor.py process [optional_workshop_id]")
