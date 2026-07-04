@@ -181,54 +181,54 @@ def render_thumbnail(model_json_path: str, output_png_path: str, verbose: bool =
 
 # ─── Per-item pipeline ───────────────────────────────────────────────────────
 
-def process_item(workshop_id: str, dry_run: bool = False, verbose: bool = False) -> str:
+def process_item(workshop_id: str, dry_run: bool = False, verbose: bool = False, progress_prefix: str = "") -> str:
     """
     Processes a single workshop ID by reading the thumbnail from public/thumbnails/<workshop_id>.png.
     Returns: 'ok', 'skipped', 'no_thumbnail', 'no_model', 'render_failed'
     """
+    import time
+    start_time = time.perf_counter()
+
+    prefix = f"{progress_prefix} " if progress_prefix else ""
+
     thumbnail_path = os.path.join(PROJECT_ROOT, "public", "thumbnails", f"{workshop_id}.png")
     if not os.path.isfile(thumbnail_path):
-        print(f"  [{workshop_id}] No PNG thumbnail found in public/thumbnails/ - skipping.")
+        elapsed = (time.perf_counter() - start_time) * 1000.0
+        print(f"  {prefix}[?] [{workshop_id}] No PNG thumbnail found in public/thumbnails/ - {elapsed:.0f}ms")
         return "no_thumbnail"
-
-    print(f"  [{workshop_id}] Checking: {workshop_id}.png")
 
     # Detection
     if not is_bad_thumbnail(thumbnail_path, verbose=verbose):
-        print(f"  [{workshop_id}] [OK] Thumbnail looks good - skipping.")
+        elapsed = (time.perf_counter() - start_time) * 1000.0
+        print(f"  {prefix}[OK] [{workshop_id}] Thumbnail looks good - {elapsed:.0f}ms")
         return "skipped"
-
-    print(f"  [{workshop_id}] [BAD] BAD thumbnail detected - needs regeneration.")
 
     # Copy the detected "bad" thumbnail to public/thumbnails/bad_detected/ for review
     bad_detected_dir = os.path.join(PROJECT_ROOT, "public", "thumbnails", "bad_detected")
     os.makedirs(bad_detected_dir, exist_ok=True)
     import shutil
     shutil.copy2(thumbnail_path, os.path.join(bad_detected_dir, f"{workshop_id}.png"))
-    print(f"  [{workshop_id}] Copied original bad thumbnail to public/thumbnails/bad_detected/ for review.")
 
     if dry_run:
-        print(f"  [{workshop_id}] [DRY RUN] Would regenerate thumbnail.")
+        elapsed = (time.perf_counter() - start_time) * 1000.0
+        print(f"  {prefix}[X] [{workshop_id}] BAD thumbnail (Dry Run) - {elapsed:.0f}ms")
         return "ok"
 
     # Find or create decrypted model in workshop_cache
     workshop_dir = os.path.join(WORKSHOP_CACHE, workshop_id)
     if not os.path.isdir(workshop_dir):
-        print(f"  [{workshop_id}] [ERROR] Workshop directory not found in cache: {workshop_dir}")
+        elapsed = (time.perf_counter() - start_time) * 1000.0
+        print(f"  {prefix}[!] [{workshop_id}] ERROR: Workshop folder missing in cache - {elapsed:.0f}ms")
         return "no_model"
 
     model_json = find_decrypted_model(workshop_dir)
     if not model_json:
-        print(f"  [{workshop_id}] Not yet decrypted - attempting decryption...")
         model_json = decrypt_lpk(workshop_dir, verbose=verbose)
 
     if not model_json:
-        print(f"  [{workshop_id}] [ERROR] Could not find/decrypt model - skipping.")
+        elapsed = (time.perf_counter() - start_time) * 1000.0
+        print(f"  {prefix}[!] [{workshop_id}] ERROR: Could not find/decrypt model - {elapsed:.0f}ms")
         return "no_model"
-
-    # Make the printed path ASCII-safe to prevent charmap errors on Windows CMD
-    safe_path = model_json.encode('ascii', errors='replace').decode('ascii')
-    print(f"  [{workshop_id}] Model: {safe_path}")
 
     # Determine the public review folder target
     fixed_dir = os.path.join(PROJECT_ROOT, "public", "thumbnails", "fixed")
@@ -241,6 +241,8 @@ def process_item(workshop_id: str, dry_run: bool = False, verbose: bool = False)
     if not success:
         if os.path.exists(target_output):
             os.remove(target_output)
+        elapsed = (time.perf_counter() - start_time) * 1000.0
+        print(f"  {prefix}[!] [{workshop_id}] ERROR: Rendering failed - {elapsed:.0f}ms")
         return "render_failed"
 
     # Update SQLite database to mark the thumbnail as regenerated
@@ -250,11 +252,12 @@ def process_item(workshop_id: str, dry_run: bool = False, verbose: bool = False)
         cursor.execute("UPDATE models SET thumbnail_regenerated = 1 WHERE id = ?", (workshop_id,))
         conn.commit()
         conn.close()
-        print(f"  [{workshop_id}] Marked as thumbnail_regenerated in SQLite database.")
     except Exception as db_err:
-        print(f"  [{workshop_id}] [WARNING] Failed to update database flag: {db_err}")
+        if verbose:
+            print(f"  {prefix}[{workshop_id}] [WARNING] Database update error: {db_err}")
 
-    print(f"  [{workshop_id}] [OK] Rendered replacement thumbnail to public/thumbnails/fixed/!")
+    elapsed_sec = time.perf_counter() - start_time
+    print(f"  {prefix}[+] [{workshop_id}] Processed and recovered bad thumbnail - {elapsed_sec:.1f}s")
     return "ok"
 
 
@@ -293,8 +296,8 @@ def main():
     counts = {"ok": 0, "skipped": 0, "no_thumbnail": 0, "no_model": 0, "render_failed": 0}
 
     for i, wid in enumerate(ids, 1):
-        print(f"\n[{i}/{len(ids)}] Workshop ID: {wid}")
-        status = process_item(wid, dry_run=args.dry_run, verbose=args.verbose)
+        progress_prefix = f"[{i}/{len(ids)}]"
+        status = process_item(wid, dry_run=args.dry_run, verbose=args.verbose, progress_prefix=progress_prefix)
         counts[status] = counts.get(status, 0) + 1
 
     print("\n" + "=" * 60)
