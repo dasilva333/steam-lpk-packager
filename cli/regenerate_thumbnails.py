@@ -62,6 +62,12 @@ ENV = load_env()
 STORAGE_DIR   = ENV.get("STORAGE_DIR", r"E:\lpk-studio-storage")
 WORKSHOP_CACHE = os.path.join(STORAGE_DIR, "workshop_cache")
 
+def get_connection():
+    db_path = os.path.join(PROJECT_ROOT, 'db', 'catalog.sqlite')
+    import sqlite3
+    conn = sqlite3.connect(db_path)
+    return conn
+
 
 # ─── Detection ───────────────────────────────────────────────────────────────
 
