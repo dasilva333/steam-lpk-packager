@@ -3,3 +3,16 @@ node_modules/
 temp_gui_batch.txt
 temp_download_batch.txt
 .DS_Store
+steamcmd/*
+cli/packages/*
+cli/temp_extract_folder/*
+live2d_packages/*
+spine_packages/*
+public/thumbnails/fixed/*
+public/thumbnails/bad_detected/*
+**/__pycache__/*
+db/catalog.sqlite
+steamcmd.zip
+public/thumbnails/*.png
+!public/thumbnails/fixed/
+!public/thumbnails/bad_detected/
