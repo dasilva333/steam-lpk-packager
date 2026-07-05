@@ -145,7 +145,7 @@ app.get('/api/process-stream', (req, res) => {
     // Start execution
     const child = spawn('python3', [
         path.join(__dirname, 'cli', 'process_batch2_safe.py'),
-        '--batch', 'temp_gui_batch.txt'
+        '--batch', tempFilePath
     ]);
 
     const sendSSE = (event, data) => {
@@ -164,45 +164,112 @@ app.get('/api/process-stream', (req, res) => {
         if (fs.existsSync(tempFilePath)) {
             fs.unlinkSync(tempFilePath);
         }
-        sendSSE('exit', { code });
+        
+        let packagedFile = null;
+        if (code === 0 && ids.length === 1) {
+            const singleId = ids[0];
+            const envConfig = loadEnv();
+            const storageDir = envConfig.STORAGE_DIR || envConfig.STORAGE_ROOT || path.join(__dirname, 'storage');
+            
+            const l2dFile = `live2d_${singleId}.zip`;
+            const l2dPath = path.join(storageDir, 'live2d_packages', l2dFile);
+            
+            const spineFile = `spine_${singleId}.zip`;
+            const spinePath = path.join(storageDir, 'spine_packages', spineFile);
+            
+            if (fs.existsSync(l2dPath)) {
+                packagedFile = {
+                    name: l2dFile,
+                    type: 'live2d',
+                    path: `/download/live2d/${l2dFile}`,
+                    localPath: l2dPath
+                };
+            } else if (fs.existsSync(spinePath)) {
+                packagedFile = {
+                    name: spineFile,
+                    type: 'spine',
+                    path: `/download/spine/${spineFile}`,
+                    localPath: spinePath
+                };
+            }
+        }
+
+        if (code === 0) {
+            refreshPackagesCache(); // background cache refresh
+        }
+        sendSSE('exit', { code, packagedFile });
         res.end();
     });
 });
 
+let cachedPackages = null;
+let isScanningPackages = false;
+
+async function refreshPackagesCache() {
+    if (isScanningPackages) return;
+    isScanningPackages = true;
+    try {
+        const envConfig = loadEnv();
+        const storageDir = envConfig.STORAGE_DIR || envConfig.STORAGE_ROOT || path.join(__dirname, 'storage');
+        const live2dPath = path.join(storageDir, 'live2d_packages');
+        const spinePath = path.join(storageDir, 'spine_packages');
+        const packages = [];
+
+        const scanDir = async (dirPath, type) => {
+            if (fs.existsSync(dirPath)) {
+                const files = await fs.promises.readdir(dirPath);
+                files.forEach(file => {
+                    if (file.endsWith('.zip')) {
+                        packages.push({
+                            name: file,
+                            size: '-- MB',
+                            type: type,
+                            path: `/download/${type}/${file}`
+                        });
+                    }
+                });
+            }
+        };
+
+        await scanDir(live2dPath, 'live2d');
+        await scanDir(spinePath, 'spine');
+        cachedPackages = packages;
+        console.log(`[Packages Cache] Refreshed: ${packages.length} items found.`);
+    } catch (err) {
+        console.error(`[Packages Cache Error]: ${err.message}`);
+    } finally {
+        isScanningPackages = false;
+    }
+}
+
+// Initial cache load in background
+setTimeout(() => {
+    refreshPackagesCache();
+}, 1000);
+
 // API: Browse Packaged ZIPs
-app.get('/api/packages', (req, res) => {
-    const envConfig = loadEnv();
-    const storageDir = envConfig.STORAGE_DIR || envConfig.STORAGE_ROOT || path.join(__dirname, 'storage');
-    const live2dPath = path.join(storageDir, 'live2d_packages');
-    const spinePath = path.join(storageDir, 'spine_packages');
-    const packages = [];
-
-    const scanDir = (dirPath, type) => {
-        if (fs.existsSync(dirPath)) {
-            const files = fs.readdirSync(dirPath);
-            files.forEach(file => {
-                if (file.endsWith('.zip')) {
-                    const stats = fs.statSync(path.join(dirPath, file));
-                    packages.push({
-                        name: file,
-                        size: (stats.size / (1024 * 1024)).toFixed(2) + ' MB',
-                        type: type,
-                        path: `/download/${type}/${file}`
-                    });
-                }
-            });
+app.get('/api/packages', async (req, res) => {
+    try {
+        // If cache isn't loaded yet, trigger scan and return empty array instantly instead of blocking
+        if (cachedPackages === null) {
+            refreshPackagesCache(); // Run in background
+            return res.json([]);
         }
-    };
-
-    scanDir(live2dPath, 'live2d');
-    scanDir(spinePath, 'spine');
-    res.json(packages);
+        
+        // Return instantly from cache
+        res.json(cachedPackages);
+        
+        // Lazily trigger background refresh to keep it fresh without blocking
+        refreshPackagesCache();
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
 // API: Catalog Query
 app.get('/api/catalog', async (req, res) => {
     try {
-        const { search, types, compatibilities, sort, page, limit, thumbnail_regenerated } = req.query;
+        const { search, types, compatibilities, sort, page, limit, thumbnail_regenerated, downloaded } = req.query;
         
         const params = {
             search: search || '',
@@ -211,7 +278,8 @@ app.get('/api/catalog', async (req, res) => {
             sort: sort || 'subscriptions',
             limit: parseInt(limit || 20),
             offset: (parseInt(page || 1) - 1) * parseInt(limit || 20),
-            thumbnail_regenerated: thumbnail_regenerated === 'true'
+            thumbnail_regenerated: thumbnail_regenerated === 'true',
+            downloaded: downloaded || 'all'
         };
         
         const data = await runDbQuery('query', params);
@@ -379,6 +447,13 @@ app.get('/download/:type/:filename', (req, res) => {
     } else {
         res.status(404).send('File not found');
     }
+});
+
+// Initialize Database on Startup
+runDbQuery('init').then(res => {
+    console.log(`[DB Initialization]: ${res.message || 'Success'}`);
+}).catch(err => {
+    console.error(`[DB Initialization Error]: ${err.message}`);
 });
 
 // Start Express App

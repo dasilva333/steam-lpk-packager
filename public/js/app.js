@@ -2,12 +2,14 @@ const { createApp, ref, reactive, computed, onMounted, nextTick } = Vue;
 
 createApp({
     setup() {
-        const currentTab = ref('packer');
+        const currentTab = ref('catalog');
         const urls = ref('');
         const isProcessing = ref(false);
         const log = ref([]);
         const packages = ref([]);
         const terminal = ref(null);
+        const lastPackagedFile = ref(null);
+        const copiedPath = ref(false);
 
         // Catalog Browser state
         const catalogItems = ref([]);
@@ -30,7 +32,8 @@ createApp({
             thumbnail_regenerated: false,
             sort: 'subscriptions',
             page: 1,
-            limit: 12
+            limit: 12,
+            downloaded: 'all'
         });
 
         // Settings / Statistics state
@@ -102,6 +105,23 @@ createApp({
             });
         };
 
+        const copyPackagedPath = () => {
+            if (!lastPackagedFile.value) return;
+            
+            const rawPath = lastPackagedFile.value.localPath;
+            
+            navigator.clipboard.writeText(rawPath).then(() => {
+                copiedPath.value = true;
+                toastMessage.value = `Copied file path to clipboard!`;
+                setTimeout(() => {
+                    toastMessage.value = '';
+                    copiedPath.value = false;
+                }, 3000);
+            }).catch(err => {
+                console.error('Could not copy path: ', err);
+            });
+        };
+
         const triggerDownload = (item) => {
             // Load the item ID into packer urls box and switch tabs to execute packaging
             urls.value = item.id;
@@ -145,7 +165,8 @@ createApp({
                     thumbnail_regenerated: catalogFilters.thumbnail_regenerated,
                     sort: catalogFilters.sort,
                     page: catalogFilters.page,
-                    limit: catalogFilters.limit
+                    limit: catalogFilters.limit,
+                    downloaded: catalogFilters.downloaded
                 });
                 const res = await fetch(`/api/catalog?${queryParams.toString()}`);
                 const data = await res.json();
@@ -245,6 +266,8 @@ createApp({
         const startPackaging = () => {
             if (!urls.value.trim()) return;
             isProcessing.value = true;
+            lastPackagedFile.value = null;
+            copiedPath.value = false;
             clearLog();
             appendLog("🚀 Starting Batch Packaging Job...", "info");
 
@@ -274,9 +297,12 @@ createApp({
             });
 
             eventSource.addEventListener('exit', (e) => {
-                const { code } = JSON.parse(e.data);
+                const { code, packagedFile } = JSON.parse(e.data);
                 if (code === 0) {
                     appendLog("✨ Batch extraction and packaging completed successfully!", "success");
+                    if (packagedFile) {
+                        lastPackagedFile.value = packagedFile;
+                    }
                 } else {
                     appendLog(`⚠️ Process terminated with code: ${code}`, "warning");
                 }
@@ -304,6 +330,7 @@ createApp({
         onMounted(() => {
             fetchPackages();
             fetchConfig();
+            fetchCatalog();
         });
 
         return {
@@ -337,7 +364,10 @@ createApp({
             fetchStats,
             selectedModel,
             openLightbox,
-            closeLightbox
+            closeLightbox,
+            lastPackagedFile,
+            copyPackagedPath,
+            copiedPath
         };
     }
 }).mount('#app');

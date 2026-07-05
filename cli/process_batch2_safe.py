@@ -7,11 +7,17 @@ import subprocess
 import time
 import urllib.parse
 import urllib.request
+import sqlite3
+
+# Resolve directories
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(SCRIPT_DIR) # Root of the steam-lpk-packager project
+DB_PATH = os.path.join(BASE_DIR, "db", "catalog.sqlite")
 
 # Helper to read basic key=values from .env if present
 def load_env_vars():
     env_vars = {}
-    env_path = os.path.join(os.path.dirname(BASE_DIR), ".env")
+    env_path = os.path.join(BASE_DIR, ".env")
     if os.path.exists(env_path):
         with open(env_path, 'r', encoding='utf-8') as f:
             for line in f:
@@ -22,10 +28,9 @@ def load_env_vars():
     return env_vars
 
 env_config = load_env_vars()
-STORAGE_DIR = env_config.get("STORAGE_DIR") or env_config.get("STORAGE_ROOT") or os.path.join(os.path.dirname(BASE_DIR), "storage")
+STORAGE_DIR = env_config.get("STORAGE_DIR") or env_config.get("STORAGE_ROOT") or os.path.join(BASE_DIR, "storage")
 
-if "steam-lpk-packager" in current_dir:
-    BASE_DIR = current_dir
+if "steam-lpk-packager" in BASE_DIR:
     LPK_DIR = os.path.join(BASE_DIR, "packages")
     LIVE2D_DIR = os.path.join(STORAGE_DIR, "live2d_packages")
     SPINE_DIR = os.path.join(STORAGE_DIR, "spine_packages")
@@ -356,12 +361,30 @@ def main():
     print(f"Found {len(ids)} unique Workshop IDs in batch file.")
 
     to_process = []
+    skipped_existing = []
+    
     for fid in ids:
         processed, reason = is_processed(fid)
         if processed:
             print(f"[SKIP]  Skipping {fid:12} | Reason: {reason}")
+            if "ZIP exists" in reason:
+                skipped_existing.append(fid)
         else:
             to_process.append(fid)
+
+    # Automatically sync DB state for skipped existing packages
+    if skipped_existing:
+        print(f"\n[DB Sync] Syncing {len(skipped_existing)} skipped existing items with catalog database...")
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            c = conn.cursor()
+            # Perform batch update
+            c.executemany("UPDATE models SET packaged = 1, download_failed = 0 WHERE id = ?", [(fid,) for fid in skipped_existing])
+            conn.commit()
+            print(f"[DB Sync] Successfully marked {c.rowcount} skipped models as packaged.")
+            conn.close()
+        except Exception as e:
+            print(f"[DB Sync Error] Failed to update skipped models status: {e}")
 
     print("-" * 60)
     print(f"Total models to process in this run: {len(to_process)}")

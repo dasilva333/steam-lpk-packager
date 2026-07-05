@@ -12,4 +12,7 @@ public/thumbnails/fixed/*
 public/thumbnails/bad_detected/*
 **/__pycache__/*
 db/catalog.sqlite
+db/catalog.sqlite.bak
+db/catalog.sqlite.user
+db/testing.sqlite
 steamcmd.zip
