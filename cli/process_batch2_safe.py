@@ -154,7 +154,7 @@ def process_item(item_id):
 
     # 3. Run the extractor script
     print("  [EXTRACT] Extracting model via batch_extract_models.py...")
-    code, stdout, stderr = run_command("python3 batch_extract_models.py")
+    code, stdout, stderr = run_command(f"python3 {os.path.join(SCRIPT_DIR, 'batch_extract_models.py')}")
     if code != 0:
         print(f"  [WARNING] batch_extract_models returned code {code}")
         print(f"  STDOUT: {stdout}")
@@ -162,14 +162,14 @@ def process_item(item_id):
 
     # 4. Run the Spine version verification script
     print("  [VERIFY] Verifying Spine versions and cataloging/pruning if incompatible...")
-    code, stdout, stderr = run_command("python3 verify_spine_versions.py")
+    code, stdout, stderr = run_command(f"python3 {os.path.join(SCRIPT_DIR, 'verify_spine_versions.py')}")
     if code != 0:
         print(f"  [WARNING] verify_spine_versions returned code {code}")
         print(f"  STDOUT: {stdout}")
 
     # 4.5 Package decrypted folder into final ZIP
     print(f"  [PACKAGE] Compiling output ZIP package for {item_id}...")
-    run_command(f"python3 package_models.py {item_id}")
+    run_command(f"python3 {os.path.join(SCRIPT_DIR, 'package_models.py')} {item_id}")
 
     # 5. Manual cleanup of packages_lpk folder (since verify_spine_versions only cleans Spine folders)
     if os.path.exists(dest_dir):
