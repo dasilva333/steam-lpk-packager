@@ -327,6 +327,36 @@ createApp({
             }
         });
 
+        const syncing = ref(false);
+        const syncResult = ref('');
+
+        const syncCatalog = async () => {
+            syncing.value = true;
+            syncResult.value = 'Running sync with Steam Workshop...';
+            toastMessage.value = 'Syncing catalog with Steam...';
+            try {
+                const res = await fetch('/api/sync-catalog', { method: 'POST' });
+                const data = await res.json();
+                if (data.error) {
+                    syncResult.value = `Error: ${data.error}`;
+                    toastMessage.value = `Sync failed: ${data.error}`;
+                } else {
+                    const msg = `Sync complete! Pages: ${data.pages}, Added: ${data.added}, Updated: ${data.updated}`;
+                    syncResult.value = msg;
+                    toastMessage.value = msg;
+                    fetchStats();
+                }
+            } catch (err) {
+                syncResult.value = `Error: ${err.message}`;
+                toastMessage.value = `Sync error: ${err.message}`;
+            } finally {
+                syncing.value = false;
+                setTimeout(() => {
+                    toastMessage.value = '';
+                }, 5000);
+            }
+        };
+
         onMounted(() => {
             fetchPackages();
             fetchConfig();
@@ -367,7 +397,10 @@ createApp({
             closeLightbox,
             lastPackagedFile,
             copyPackagedPath,
-            copiedPath
+            copiedPath,
+            syncing,
+            syncResult,
+            syncCatalog
         };
     }
 }).mount('#app');

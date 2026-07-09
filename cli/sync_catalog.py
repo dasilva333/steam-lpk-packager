@@ -129,7 +129,15 @@ def sync():
         time.sleep(0.5)
 
     conn.close()
-    print(f"Sync complete! Pages fetched: {page_count}. Added: {added_count}. Updated: {updated_count}.")
+    
+    # Output structured JSON to stdout for the backend to consume
+    result = {
+        "success": True,
+        "pages": page_count,
+        "added": added_count,
+        "updated": updated_count
+    }
+    print(json.dumps(result))
 
 if __name__ == '__main__':
     sync()

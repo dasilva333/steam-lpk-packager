@@ -41,6 +41,11 @@
 
         <!-- Main Body -->
         <main class="main-content">
+            <!-- Global Toast Notification -->
+            <div v-if="toastMessage" class="toast-alert" style="position: fixed; bottom: 20px; right: 20px; z-index: 1000; background: var(--success-color); color: #fff; padding: 12px 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); font-weight: 500; display: flex; align-items: center; gap: 8px;">
+                <span>✨</span> \{{ toastMessage }}
+            </div>
+
             <!-- TAB 1: Batch Packer -->
             <div v-if="currentTab === 'packer'">
                 <header class="top-bar">
@@ -311,11 +316,6 @@
                         </div>
                     </div>
 
-                    <!-- Toast Notification -->
-                    <div v-if="toastMessage" class="toast-alert">
-                        <span>✨</span> {{ toastMessage }}
-                    </div>
-
                     <!-- Pagination -->
                     <div class="pagination">
                         <button 
@@ -408,6 +408,15 @@
                             <div class="stat-box">
                                 <span class="stat-number green-text">{{ stats.compatible || 0 }}</span>
                                 <span class="stat-label">Compatible</span>
+                            </div>
+                        </div>
+                        <div style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 16px; display: flex; flex-direction: column; gap: 8px;">
+                            <button @click="syncCatalog" class="btn primary-btn" :disabled="syncing" style="align-self: flex-start; display: flex; align-items: center; gap: 8px;">
+                                <span v-if="syncing">⏳ Syncing...</span>
+                                <span v-else>🔄 Sync Catalog with Steam</span>
+                            </button>
+                            <div v-if="syncResult" style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">
+                                {{ syncResult }}
                             </div>
                         </div>
                     </section>

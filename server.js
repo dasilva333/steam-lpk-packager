@@ -299,6 +299,42 @@ app.get('/api/stats', async (req, res) => {
     }
 });
 
+// API: Sync Catalog with Steam
+app.post('/api/sync-catalog', async (req, res) => {
+    try {
+        const cmdBinary = process.platform === 'win32' ? 'py' : 'python3';
+        const child = spawn(cmdBinary, [path.join(__dirname, 'cli', 'sync_catalog.py')]);
+
+        let stdout = '';
+        let stderr = '';
+
+        child.stdout.on('data', (data) => {
+            stdout += data.toString();
+        });
+
+        child.stderr.on('data', (data) => {
+            stderr += data.toString();
+        });
+
+        child.on('close', (code) => {
+            if (code !== 0) {
+                return res.status(500).json({ error: stderr || `Sync process exited with code ${code}` });
+            }
+            try {
+                // Find the last non-empty line of stdout which should contain our JSON
+                const lines = stdout.trim().split('\n');
+                const lastLine = lines[lines.length - 1];
+                const parsed = JSON.parse(lastLine);
+                res.json(parsed);
+            } catch (e) {
+                res.json({ success: true, raw: stdout });
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Helper to read .env key=values
 function loadEnv() {
     const envPath = path.join(__dirname, '.env');
