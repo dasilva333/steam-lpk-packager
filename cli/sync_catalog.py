@@ -24,7 +24,7 @@ def fetch_page(api_key, cursor="*"):
     params = {
         "key": api_key,
         "appid": "616720",
-        "query_type": "1", # Most Subscribed
+        "query_type": "0", # Most Recent (ranked by publication date)
         "numperpage": "100",
         "cursor": cursor,
         "return_details": "1",
@@ -61,7 +61,8 @@ def sync():
     added_count = 0
     updated_count = 0
 
-    while next_cursor:
+    caught_up = False
+    while next_cursor and not caught_up:
         print(f"Fetching page {page_count + 1}...")
         response = fetch_page(api_key, next_cursor)
         if not response:
@@ -100,16 +101,9 @@ def sync():
             tags_json = json.dumps(tags)
 
             if item_id in existing_ids:
-                # Update existing records
-                cursor.execute('''
-                    UPDATE models SET
-                        title = ?, description = ?, creator = ?, thumbnail_url = ?,
-                        file_size = ?, tags = ?, subscriptions = ?, steam_type = ?,
-                        updated_at = ?, indexed_at = ?
-                    WHERE id = ?
-                ''', (title, description, creator, thumbnail_url, file_size, tags_json, 
-                      subscriptions, steam_type, updated_at, indexed_at, item_id))
-                updated_count += 1
+                print(f"Reached existing item {item_id} (title: '{title}'). Database is up to date!")
+                caught_up = True
+                break
             else:
                 # Insert new records
                 cursor.execute('''
