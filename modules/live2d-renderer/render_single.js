@@ -37,7 +37,7 @@ if (!fs.existsSync(modelJsonAbs)) {
 // ── Express ──────────────────────────────────────────────────────────────────
 const app = express();
 app.use(express.static(__dirname));
-app.use('/model', express.static(modelDir));
+app.use('/model', express.static(modelDir, { dotfiles: 'allow' }));
 
 const server = app.listen(PORT, () => {
     console.log(`[live2d-renderer] Server running on ${HOST}`);

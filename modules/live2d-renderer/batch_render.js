@@ -103,7 +103,7 @@ function cleanJsonString(str) {
     return str;
 }
 
-// Recursively find all *.model3.json files
+// Recursively find all *.model3.json and *.model.json files
 function findModelJsons(dir, fileList = []) {
     let files;
     try {
@@ -121,7 +121,7 @@ function findModelJsons(dir, fileList = []) {
         }
         if (stat.isDirectory()) {
             findModelJsons(filePath, fileList);
-        } else if (file.toLowerCase().endsWith('.model3.json')) {
+        } else if (file.toLowerCase().endsWith('.model3.json') || file.toLowerCase().endsWith('.model.json')) {
             fileList.push(filePath);
         }
     }
@@ -133,7 +133,7 @@ function generateSlug(relativePath) {
     return relativePath
         .replace(/^[\\/]+/, '') // Remove leading slashes
         .replace(/[\\/]/g, '_') // Replace directory separators with underscores
-        .replace(/\.model3\.json$/i, '') // Remove extension
+        .replace(/\.(model3|model)\.json$/i, '') // Remove extension (handling both model3 and model)
         .replace(/[^a-zA-Z0-9_\-]/g, ''); // Keep only alphanumeric, underscores, hyphens
 }
 
@@ -278,7 +278,7 @@ async function main() {
 
     console.log(`[batch-renderer] Scanning ${ROOT_MODEL_DIR} for models...`);
     const absoluteModelPaths = findModelJsons(ROOT_MODEL_DIR);
-    console.log(`[batch-renderer] Found ${absoluteModelPaths.length} model3.json configurations.`);
+    console.log(`[batch-renderer] Found ${absoluteModelPaths.length} model configurations.`);
 
     const chromePath = (() => {
         const candidates = [
