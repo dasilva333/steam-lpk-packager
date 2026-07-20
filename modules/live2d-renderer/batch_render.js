@@ -14,7 +14,7 @@ const sharp     = require('sharp');
 
 const PORT = 3210;
 const HOST = `http://127.0.0.1:${PORT}`;
-const CONCURRENCY = 1; // Number of parallel browser tabs
+const CONCURRENCY = 2; // Number of parallel browser tabs
 const TIMEOUT_MS = 20000; // Timeout per model
 
 const ROOT_MODEL_DIR = 'E:\\Live2d-model';

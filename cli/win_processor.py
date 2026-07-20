@@ -33,23 +33,26 @@ def get_connection():
     return sqlite3.connect(DB_PATH)
 
 def extract_spine_version(skel_path):
-    # Try reading as binary first
     try:
+        # Check if JSON format
+        if skel_path.lower().endswith(".json"):
+            with open(skel_path, 'r', encoding='utf-8', errors='ignore') as f:
+                data = json.load(f)
+                version = data.get("skeleton", {}).get("spine")
+                if version:
+                    return version
+        
+        # Read 200 bytes for binary/fallback signature scanning
         with open(skel_path, 'rb') as f:
-            header = f.read(16)
-            # Spine binary headers usually start with version floats encoded as strings or bytes
-            for match in glob.glob(os.path.dirname(skel_path) + "/*.json"):
-                with open(match, 'r', encoding='utf-8', errors='ignore') as jf:
-                    data = json.load(jf)
-                    if "skeleton" in data and "spine" in data["skeleton"]:
-                        return data["skeleton"]["spine"]
-            # Fallback signature scanning
-            text = header.decode('utf-8', errors='ignore')
+            content = f.read(200)
             import re
-            m = re.search(r'(\d+\.\d+\.\d+)', text)
-            if m:
-                return m.group(1)
-    except:
+            match = re.search(rb'([0-9]+\.[0-9]+\.[0-9]+)', content)
+            if match:
+                return match.group(1).decode("ascii", errors="ignore")
+            match_short = re.search(rb'([0-9]+\.[0-9]+)', content)
+            if match_short:
+                return match_short.group(1).decode("ascii", errors="ignore")
+    except Exception as e:
         pass
     return "Unknown"
 
@@ -185,8 +188,26 @@ def process_item(item_id):
         elif skel_files:
             packaged = 1
             steam_type = "Spine"
-            compatible = 1
-            spine_ver = "4.x"
+            # Extract actual Spine version to determine compatibility
+            detected_ver = extract_spine_version(skel_files[0])
+            spine_ver = detected_ver
+            if detected_ver.startswith("4."):
+                compatible = 1
+            else:
+                compatible = 0
+                compat_reason = f"Unsupported Spine version: {detected_ver} (requires Spine 4.x)"
+            
+    if not packaged:
+        # Check if it was flagged as incompatible Spine model
+        incompatible_log = os.path.join(BASE_DIR, "cli", "spine_packages", "incompatible_spine_models.md")
+        if os.path.exists(incompatible_log):
+            with open(incompatible_log, 'r', encoding='utf-8') as f:
+                content = f.read()
+                if f"spine_{item_id}" in content:
+                    steam_type = "Spine"
+                    compatible = 0
+                    compat_reason = "Incompatible Spine runtime version (requires Spine 4.x)"
+                    spine_ver = "3.x"
             
     if not packaged:
         # Check if it was flagged as incompatible Spine model

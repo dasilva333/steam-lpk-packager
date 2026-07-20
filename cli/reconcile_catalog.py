@@ -59,9 +59,10 @@ def run_reconciliation():
                 steam_type = "Live2D"
                 cubism_ver = "3.x-4.x"
             elif skel:
+                from win_processor import extract_spine_version
                 valid_decrypted = True
                 steam_type = "Spine"
-                spine_ver = "4.x"
+                spine_ver = extract_spine_version(skel[0])
 
         # Safe LPK cleanup
         lpk_files = glob.glob(os.path.join(item_dir, "*.lpk"))
@@ -74,6 +75,15 @@ def run_reconciliation():
 
         # Update database status based on current files on disk
         if valid_decrypted:
+            compatible = 1
+            compat_reason = None
+            if steam_type == "Spine":
+                if spine_ver and spine_ver.startswith("4."):
+                    compatible = 1
+                else:
+                    compatible = 0
+                    compat_reason = f"Unsupported Spine version: {spine_ver} (requires Spine 4.x)"
+
             c.execute('''
                 UPDATE models SET
                     fingerprinted = 1,
@@ -81,9 +91,11 @@ def run_reconciliation():
                     steam_type = ?,
                     cubism_version = ?,
                     spine_version = ?,
+                    compatible = ?,
+                    compat_reason = ?,
                     download_failed = 0
                 WHERE id = ?
-            ''', (steam_type, cubism_ver, spine_ver, wid))
+            ''', (steam_type, cubism_ver, spine_ver, compatible, compat_reason, wid))
             total_reconciled += 1
         else:
             # If no valid decryption exists, mark it as not processed so the pipeline picks it up
