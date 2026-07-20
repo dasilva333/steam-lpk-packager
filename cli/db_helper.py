@@ -38,7 +38,8 @@ def init_db():
             download_failed_reason TEXT,
             created_at INTEGER,
             updated_at INTEGER,
-            indexed_at INTEGER
+            indexed_at INTEGER,
+            thumbnail_regenerated INTEGER DEFAULT 0
         )
     ''')
     
@@ -49,8 +50,47 @@ def init_db():
         cursor.execute("ALTER TABLE models ADD COLUMN download_failed INTEGER DEFAULT 0")
     if 'download_failed_reason' not in columns:
         cursor.execute("ALTER TABLE models ADD COLUMN download_failed_reason TEXT")
+    if 'thumbnail_regenerated' not in columns:
+        cursor.execute("ALTER TABLE models ADD COLUMN thumbnail_regenerated INTEGER DEFAULT 0")
         
     conn.commit()
+
+    # Seed the database if it is empty
+    cursor.execute("SELECT COUNT(*) FROM models")
+    count = cursor.fetchone()[0]
+    if count == 0:
+        seed_path = os.path.join(BASE_DIR, 'db', 'seeds', 'catalog_seed.json.gz')
+        if os.path.exists(seed_path):
+            import gzip
+            try:
+                if sys.version_info < (3, 0):
+                    import io
+                    with gzip.open(seed_path, 'rb') as f_bin:
+                        with io.TextIOWrapper(f_bin, encoding='utf-8') as sf_wrapper:
+                            models_data = json.load(sf_wrapper)
+                else:
+                    with gzip.open(seed_path, 'rt', encoding='utf-8') as sf_rt:
+                        models_data = json.load(sf_rt)
+                
+                print("Seeding database with %d models from %s..." % (len(models_data), seed_path))
+                cursor.executemany("""
+                    INSERT OR IGNORE INTO models (
+                        id, title, description, creator, thumbnail_url, thumbnail_local, 
+                        file_size, tags, subscriptions, steam_type, cubism_version, 
+                        spine_version, compatible, compat_reason, fingerprinted, 
+                        packaged, download_failed
+                    ) VALUES (
+                        :id, :title, :description, :creator, :thumbnail_url, :thumbnail_local,
+                        :file_size, :tags, :subscriptions, :steam_type, :cubism_version,
+                        :spine_version, :compatible, :compat_reason, 0, 0, 0
+                    )
+                """, models_data)
+                conn.commit()
+            except Exception as e:
+                print("Failed to seed database: %s" % str(e))
+        else:
+            print("Seed file not found at: %s" % seed_path)
+
     conn.close()
     return {"success": True, "message": "Database initialized & migrated"}
 
@@ -100,6 +140,13 @@ def query_catalog(params):
     # Filter for regenerated thumbnails
     if params.get('thumbnail_regenerated') == 'true' or params.get('thumbnail_regenerated') is True:
         query += " AND thumbnail_regenerated = 1"
+        
+    # Filter for local download status
+    downloaded_filter = params.get('downloaded', 'all')
+    if downloaded_filter == 'yes':
+        query += " AND packaged = 1"
+    elif downloaded_filter == 'no':
+        query += " AND packaged = 0"
             
     # Count total matching query before pagination
     count_query = query.replace("SELECT *", "SELECT COUNT(*) as count")

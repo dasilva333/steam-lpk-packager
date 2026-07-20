@@ -6,10 +6,13 @@ temp_download_batch.txt
 steamcmd/*
 cli/packages/*
 cli/temp_extract_folder/*
-live2d_packages/*
-spine_packages/*
+**/live2d_packages/*
+**/spine_packages/*
 public/thumbnails/fixed/*
 public/thumbnails/bad_detected/*
 **/__pycache__/*
 db/catalog.sqlite
+db/catalog.sqlite.bak
+db/catalog.sqlite.user
+db/testing.sqlite
 steamcmd.zip
