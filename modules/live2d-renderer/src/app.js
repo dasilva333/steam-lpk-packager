@@ -33,7 +33,7 @@ window.renderModel = async function(modelUrl) {
                 app.stage.removeChild(currentModel);
             }
             if (typeof currentModel.destroy === 'function') {
-                currentModel.destroy({ children: true, texture: false, baseTexture: false });
+                currentModel.destroy({ children: true, texture: true, baseTexture: true });
             }
         } catch (cleanupErr) {
             console.warn('[live2d-renderer] Cleanup warning:', cleanupErr.message);

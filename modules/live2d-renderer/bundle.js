@@ -27699,7 +27699,11 @@ void main(void)\r
     const placeholderTexture = Texture.from(TRANSPARENT_PIXEL);
     console.log(`[Sanitizer] Probing ${textures.length} texture(s)...`);
     for (let i2 = 0; i2 < textures.length; i2++) {
-      const originalPath = textures[i2];
+      let originalPath = textures[i2];
+      if (originalPath.includes("#")) {
+        originalPath = originalPath.replace(/#/g, "%23");
+        textures[i2] = originalPath;
+      }
       const fullUrl = new URL(originalPath, textureBase).href;
       try {
         await Assets.load(fullUrl);
@@ -27707,6 +27711,9 @@ void main(void)\r
       } catch (err) {
         console.warn(`[Sanitizer] Texture [${i2}] FAILED: ${originalPath} \u2014 injecting fallback.`);
         Assets.cache.set(fullUrl, placeholderTexture);
+        if (lib_exports && lib_exports.TextureCache) {
+          lib_exports.TextureCache[fullUrl] = placeholderTexture;
+        }
       }
     }
     const bloom = textures.filter((t2) => t2.toLowerCase().includes("_bloom"));
@@ -38416,7 +38423,7 @@ void main(void)\r
           app.stage.removeChild(currentModel);
         }
         if (typeof currentModel.destroy === "function") {
-          currentModel.destroy({ children: true, texture: false, baseTexture: false });
+          currentModel.destroy({ children: true, texture: true, baseTexture: true });
         }
       } catch (cleanupErr) {
         console.warn("[live2d-renderer] Cleanup warning:", cleanupErr.message);

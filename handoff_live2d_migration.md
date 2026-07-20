@@ -37,30 +37,23 @@ While 1,156 thumbnails were rendered successfully, **232 models failed**. The pr
 
 ---
 
-## 3. Speculative Pipeline: Headless `.moc` to `.moc3` Conversion
+## 3. Automated `.moc` to `.moc3` Conversion Pipeline
 
-To convert the remaining **3,552 `.moc`** files to `.moc3` and generate thumbnails for them, we need a fully automated headless pipeline. 
+To convert the remaining **3,552 `.moc`** files to `.moc3` and generate thumbnails for them, we will use a hybrid automated workflow:
 
-### Step 1: `.moc` to `.cmo3` (Using Quadrism)
-We can run a batch script that loops through all `.moc` files and feeds them into the Quadrism compiler to produce `.cmo3` files:
+### Step 1: Headless `.moc` to `.cmo3` (Using Quadrism)
+Run a batch script that loops through all `.moc` files and feeds them into the Quadrism compiler to produce `.cmo3` files:
 ```sh
 quadexec conv <input.moc> <output.cmo3>
 ```
-*Since Quadrism handles this conversion headlessly, this step can be completely automated in a simple Node.js or Python loop.*
 
-### Step 2: `.cmo3` to `.moc3` (The Headless Challenge)
-Live2D Cubism Editor is a GUI-based desktop application and does not natively support headless CLI exports of `.moc3` files. To automate this step, we can speculate on two paths:
+### Step 2: GUI Automation / Auto-Clicker Workflow
+Since Live2D Cubism Editor has no headless CLI exporter for `.moc3` files, we will use an auto-clicker script (VBScript, AutoIt, RobotJS, or PyAutoGUI) to drive the Live2D GUI:
 
-1. **GUI Automation Scripting (VBScript / AutoIt / RobotJS / PyAutoGUI):**
-   * Write a lightweight macro runner on the Windows machine.
-   * For each `.cmo3` generated in Step 1:
-     1. Open Live2D Cubism Editor with the `.cmo3` file as an argument: `CubismEditor.exe "path/to/model.cmo3"`.
-     2. Send keystrokes to trigger the export menu: `Alt + F` (File) -> `E` (Export Embedded) -> `M` (Export as moc3).
-     3. Automate clicking "OK" on the export settings and confirmation dialogs.
-     4. Close the editor window.
-   * *Tradeoff:* Requires a logged-in active Windows GUI session (cannot run in a true ssh-only background environment).
-
-2. **Automated Live2D Editor Plugin (Java/Cubism SDK):**
-   * Live2D Cubism Editor is built on Java. It may be possible to write a custom Editor plugin/extension that listens for a folder directory or runs on startup to load, export, and close files sequentially.
-
-Once the `.moc3` files are exported using either method, they can be fed directly into our `batch_render.js` script to generate the final thumbnails.
+1. **File > Open:** Open the compiled `.cmo3` model file.
+2. **Modeling > Convert Model IDs:** Run this function to convert legacy Cubism 2.x parameter IDs into the modern Cubism 3/4 standard.
+3. **Motion Export Setup:** Incorporate steps to export/translate the original motions into `.motion3.json` files.
+4. **File > Export Runtime > Export as moc3:**
+   * Select **SDK3.0/Cubism3.0(3.2)** or **SDK4.0/Cubism4.0(4.2)** or **SDK5.0/Cubism5.0** from the dropdown menu depending on target capabilities.
+   * Click **OK** to export the model files.
+5. **Re-populate Manifest & Package:** Extract/move the newly exported `.moc3` and `.motion3.json` files, and resolve their paths inside the model's `manifest.json` or `model3.json`.

@@ -24,7 +24,12 @@ export async function sanitizeModel(modelUrl, modelSettings) {
     console.log(`[Sanitizer] Probing ${textures.length} texture(s)...`);
 
     for (let i = 0; i < textures.length; i++) {
-        const originalPath = textures[i];
+        let originalPath = textures[i];
+        // Fix hash fragment bug: replace '#' with '%23' to prevent the browser from truncating the URL
+        if (originalPath.includes('#')) {
+            originalPath = originalPath.replace(/#/g, '%23');
+            textures[i] = originalPath;
+        }
         const fullUrl = new URL(originalPath, textureBase).href;
         try {
             await PIXI.Assets.load(fullUrl);
@@ -32,6 +37,9 @@ export async function sanitizeModel(modelUrl, modelSettings) {
         } catch (err) {
             console.warn(`[Sanitizer] Texture [${i}] FAILED: ${originalPath} — injecting fallback.`);
             PIXI.Assets.cache.set(fullUrl, placeholderTexture);
+            if (PIXI.utils && PIXI.utils.TextureCache) {
+                PIXI.utils.TextureCache[fullUrl] = placeholderTexture;
+            }
         }
     }
 
